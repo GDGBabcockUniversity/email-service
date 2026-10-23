@@ -1,0 +1,837 @@
+basePath: /
+definitions:
+  domain.ApiKey:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      project_id:
+        type: string
+      revoked:
+        type: boolean
+      revoked_at:
+        type: string
+    type: object
+  domain.Project:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      user_id:
+        type: string
+    type: object
+  domain.Status:
+    enum:
+    - PENDING
+    - PROCESSING
+    - SENT
+    - FAILED
+    type: string
+    x-enum-varnames:
+    - StatusPending
+    - StatusProcessing
+    - StatusSent
+    - StatusFailed
+  domain.Template:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      data:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      name:
+        type: string
+      project_id:
+        type: string
+      subject:
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.AddAudienceRequest:
+    properties:
+      audiences:
+        items:
+          $ref: '#/definitions/dto.Audience'
+        type: array
+    required:
+    - audiences
+    type: object
+  dto.Audience:
+    properties:
+      email:
+        maxLength: 254
+        type: string
+    required:
+    - email
+    type: object
+  dto.CreateProjectRequest:
+    properties:
+      description:
+        maxLength: 2000
+        type: string
+      name:
+        maxLength: 200
+        type: string
+    required:
+    - name
+    type: object
+  dto.CreateTemplateRequest:
+    properties:
+      content:
+        type: string
+      data:
+        items:
+          type: string
+        type: array
+      name:
+        maxLength: 200
+        type: string
+      subject:
+        maxLength: 998
+        type: string
+    required:
+    - content
+    - name
+    - subject
+    type: object
+  dto.Response:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  dto.SendEmailRequest:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      template:
+        type: string
+      to:
+        maxLength: 254
+        type: string
+    required:
+    - template
+    - to
+    type: object
+  dto.SwaggerAPIKeyData:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      project_id:
+        type: string
+    type: object
+  dto.SwaggerAcceptedEmailData:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/domain.Status'
+    type: object
+  dto.SwaggerAcceptedEmailResponse:
+    properties:
+      data:
+        $ref: '#/definitions/dto.SwaggerAcceptedEmailData'
+      message:
+        type: string
+    type: object
+  dto.SwaggerApiKeySecretResponse:
+    properties:
+      data:
+        $ref: '#/definitions/dto.SwaggerAPIKeyData'
+      message:
+        type: string
+    type: object
+  dto.SwaggerApiKeysResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.ApiKey'
+        type: array
+      message:
+        type: string
+    type: object
+  dto.SwaggerProjectResponse:
+    properties:
+      data:
+        $ref: '#/definitions/domain.Project'
+      message:
+        type: string
+    type: object
+  dto.SwaggerProjectsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Project'
+        type: array
+      message:
+        type: string
+    type: object
+  dto.SwaggerTemplateResponse:
+    properties:
+      data:
+        $ref: '#/definitions/domain.Template'
+      message:
+        type: string
+    type: object
+  dto.SwaggerTemplatesResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Template'
+        type: array
+      message:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Project and template management with authenticated asynchronous email
+    delivery.
+  title: GDG Email Service API
+  version: "1.0"
+paths:
+  /api/email:
+    post:
+      consumes:
+      - application/json
+      description: Renders a project template with the supplied data and queues the
+        email for SMTP delivery.
+      parameters:
+      - description: Email recipient and template data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SendEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/dto.SwaggerAcceptedEmailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - ProjectApiKey: []
+      summary: Queue an email
+      tags:
+      - Email
+  /api/projects:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerProjectsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: List projects
+      tags:
+      - Projects
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Project name and description
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.SwaggerProjectResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Create a project
+      tags:
+      - Projects
+  /api/projects/{projectId}:
+    delete:
+      description: Also soft-deletes its templates and revokes its API keys.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Soft-delete a project
+      tags:
+      - Projects
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerProjectResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Get a project
+      tags:
+      - Projects
+    put:
+      consumes:
+      - application/json
+      description: Replaces the project's name and description.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Updated project
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerProjectResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Update a project
+      tags:
+      - Projects
+  /api/projects/{projectId}/api-keys:
+    get:
+      description: Does not return raw keys or stored hashes.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerApiKeysResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: List API key metadata for a project
+      tags:
+      - API keys
+    post:
+      description: The raw key is returned once; store it securely.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.SwaggerApiKeySecretResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Create a project API key
+      tags:
+      - API keys
+  /api/projects/{projectId}/api-keys/{id}:
+    delete:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: API key UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Revoke a project API key
+      tags:
+      - API keys
+  /api/projects/{projectId}/audience:
+    post:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Audience to add
+        in: body
+        name: audience
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AddAudienceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Add audience to a project
+      tags:
+      - Audience
+  /api/projects/{projectId}/templates:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerTemplatesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: List a project's templates
+      tags:
+      - Templates
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Template subject, content, and example data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.SwaggerTemplateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Create a project template
+      tags:
+      - Templates
+  /api/projects/{projectId}/templates/{id}:
+    delete:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Soft-delete a template
+      tags:
+      - Templates
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerTemplateResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Get a template
+      tags:
+      - Templates
+    put:
+      consumes:
+      - application/json
+      description: Replaces the template's name, subject, content, and example data.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated template
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerTemplateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Update a template
+      tags:
+      - Templates
+securityDefinitions:
+  AdminKey:
+    in: header
+    name: X-Admin-Key
+    type: apiKey
+  ProjectApiKey:
+    in: header
+    name: x-gdg_email-apikey
+    type: apiKey
+swagger: "2.0"
