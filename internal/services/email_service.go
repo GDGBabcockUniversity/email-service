@@ -33,7 +33,7 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 		}
 	}
 	
-	record, err := s.templateRepo.FindByName(ctx, request.Template)
+	record, err := s.templateRepo.FindByNameAndProjectID(ctx, request.Template, projectID)
 	if err != nil {
 		return nil, err
 	}

@@ -14,7 +14,7 @@ type CreateProjectRequest struct {
 
 type SendEmailRequest struct {
 	To       string            `json:"to" binding:"required,max=254"`
-	Template string            `json:"template" binding:"required,uuid"`
+	Template string            `json:"template" binding:"required,max=200"`
 	Data     map[string]string `json:"data"`
 }
 

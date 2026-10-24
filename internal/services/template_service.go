@@ -51,14 +51,10 @@ func (s *TemplateService) GetTemplate(ctx context.Context, projectID, name strin
 		return nil, err
 	}
 
-	record, err := s.templateRepo.FindByName(ctx, name)
+	record, err := s.templateRepo.FindByNameAndProjectID(ctx, name, projectID)
 
 	if err != nil {
 		return nil, err
-	}
-
-	if record.ProjectID != projectID {
-		return nil, domain.ErrNotFound
 	}
 
 	return record, nil
@@ -79,7 +75,7 @@ func (s *TemplateService) GetTemplateByID(ctx context.Context, projectID, id str
 }
 
 func (s *TemplateService) UpdateTemplate(ctx context.Context, projectID, id string, request dto.CreateTemplateRequest) (*domain.Template, error) {
-	record, err := s.GetTemplate(ctx, projectID, id)
+	record, err := s.GetTemplateByID(ctx, projectID, id)
 	if err != nil {
 		return nil, err
 	}

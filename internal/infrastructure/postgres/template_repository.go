@@ -23,8 +23,10 @@ func (r *TemplateRepository) FindByID(ctx context.Context, id string) (*domain.T
 	return &template, nil
 }
 
-func (r *TemplateRepository) FindByName(ctx context.Context, name string) (*domain.Template, error) {
-	template, err := gorm.G[domain.Template](r.db).Where("name = ?", name).First(ctx)
+// FindByNameAndProjectID resolves a template by its name within one project.
+// Names are only unique per project, so the project is part of the lookup.
+func (r *TemplateRepository) FindByNameAndProjectID(ctx context.Context, name, projectID string) (*domain.Template, error) {
+	template, err := gorm.G[domain.Template](r.db).Where("name = ? AND project_id = ?", name, projectID).First(ctx)
 	if err != nil {
 		return nil, repositoryError(err)
 	}

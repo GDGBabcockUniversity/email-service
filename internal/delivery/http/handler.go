@@ -244,14 +244,14 @@ func (h *Handler) listTemplates(c *gin.Context) {
 // @Produce json
 // @Param projectId path string true "Project UUID"
 // @Param id path string true "Template UUID"
-// @Success 200 {object} dto.Response
+// @Success 200 {object} dto.SwaggerTemplateResponse
 // @Failure 401 {object} dto.Response
 // @Failure 404 {object} dto.Response
 // @Failure 503 {object} dto.Response
 // @Failure 500 {object} dto.Response
 // @Router /api/projects/{projectId}/templates/{id} [get]
 func (h *Handler) getTemplate(c *gin.Context) {
-	template, err := h.templateService.GetTemplate(c.Request.Context(), c.Param("projectId"), c.Param("id"))
+	template, err := h.templateService.GetTemplateByID(c.Request.Context(), c.Param("projectId"), c.Param("id"))
 	if err != nil {
 		respondError(c, err)
 		return

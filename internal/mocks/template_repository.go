@@ -24,11 +24,11 @@ func (m *TemplateRepository) FindByID(ctx context.Context, id string) (*domain.T
 	return template, args.Error(1)
 }
 
-func (m *TemplateRepository) FindByName(ctx context.Context, name string) (*domain.Template, error) {
+func (m *TemplateRepository) FindByNameAndProjectID(ctx context.Context, name, projectID string) (*domain.Template, error) {
 
 	var template *domain.Template
 
-	args := m.Called(ctx, name)
+	args := m.Called(ctx, name, projectID)
 
 	if value := args.Get(0); value != nil {
 		template = value.(*domain.Template)
