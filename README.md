@@ -1,10 +1,12 @@
 # GDG Email Service
 
+[![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=GDGBabcockUniversity/email-service)](https://www.keyway.sh/vaults/GDGBabcockUniversity/email-service)
+
 Go/Gin HTTP API, PostgreSQL/GORM, Redis Streams, and SMTP. The API and one email consumer run together.
 
 ## Run
 
-Copy `.env.example` to `.env` and fill in `DB_PASSWORD`, `ADMIN_API_KEY`, and the SMTP settings. Credentials are not included.
+Copy `.env.example` to `.env` and fill in `DB_PASSWORD`, `ADMIN_API_KEY`, `UNSUBSCRIBE_SECRET`, and the SMTP settings. Credentials are not included.
 
 ```sh
 cp .env.example .env
@@ -14,6 +16,8 @@ docker compose logs -f app
 ```
 
 SMTP uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM`. Set `SMTP_TLS_MODE=starttls` for STARTTLS (default port 587), or `tls` for implicit TLS (set port 465). Supply your Gmail app password or Brevo SMTP credentials and an authorized sender address. `none` is supported only with empty SMTP username/password for local test servers.
+
+`UNSUBSCRIBE_SECRET` (`openssl rand -hex 32`) signs the unsubscribe tokens, and `PUBLIC_BASE_URL` is the origin used to build the unsubscribe links inside emails; set it to the service's public URL in production. Rotating the secret invalidates every unsubscribe link already in recipients' inboxes.
 
 Compose supplies the database hostname and local Redis URL. To use Upstash, set `REDIS_URL` to its Redis protocol `rediss://...` URL, not its REST URL. PostgreSQL and Redis data use named volumes.
 
@@ -77,6 +81,8 @@ swag init -g cmd/server/main.go -o cmd/server/docs
 | GET | `/api/projects/:projectId/emails` | List recent emails (`status`, `limit` query params) |
 | GET | `/api/projects/:projectId/emails/stats` | Count emails per delivery status |
 | POST | `/api/email` | Queue email |
+| GET / POST | `/api/unsubscribe?token=...` | Unsubscribe a recipient (public, no key) |
+| POST | `/api/resubscribe?token=...` | Resubscribe the same recipient (public, no key) |
 
 Responses follow `{"message":"...","data":...}`. Creates return 201, management reads/updates/deletes return 200, and accepted emails return 202. Errors use 400 (input), 401 (authentication), 404 (missing/inaccessible resource), 409 (conflict), 503 (dependency unavailable), or 500 (unexpected failure).
 
@@ -127,6 +133,29 @@ Response:
 ```
 
 `template` is the template's name, resolved within the authenticated key's project, so two projects can reuse the same template name without reaching each other's content. `POST /api/projects/:projectId/emails` queues the same way but authenticates with the admin key instead of a project key, which is how the dashboard sends without holding a project key in the browser. Set `to` to `all` to send to every address in the project's audience; otherwise one recipient is accepted per request. Request bodies are limited to 1 MiB.
+
+### Unsubscribes
+
+Every audience entry gets one unsubscribe token, derived from `UNSUBSCRIBE_SECRET` plus the project and address. Only its SHA-256 hash is stored; the token itself exists in the recipient's link. Templates receive the recipient's link as `{{ .UnsubscribeURL }}`:
+
+```sh
+curl -X POST "http://localhost:8080/api/projects/$PROJECT_ID/templates" \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"news","subject":"GDG news","content":"<p>Hello.</p><p><a href=\"{{ .UnsubscribeURL }}\">Unsubscribe</a></p>"}'
+```
+
+Templates created or edited on the dashboard get `<p><a href="{{ .UnsubscribeURL }}">Unsubscribe</a></p>` appended to the body on save, unless the body already references `{{ .UnsubscribeURL }}` somewhere — move it to place the link yourself. Templates created straight through the API are left exactly as submitted.
+
+Clicking the link hits `GET /api/unsubscribe?token=...`, which hashes the token, finds the subscription it belongs to, and sets `subscribed` to false:
+
+```json
+{"message":"Unsubscribed","data":{"email":"recipient@example.com","project_id":"<project UUID>","subscribed":false}}
+```
+
+The audience entry stays in place. `to: "all"` sends only to subscribed addresses, and a single-recipient send to an address that unsubscribed is refused with 409. Sending to an address outside the audience renders `{{ .UnsubscribeURL }}` as an empty string.
+
+`POST /api/resubscribe?token=...` turns the same entry back on, and re-adding the address through `POST /api/projects/:projectId/audience` does the same: an address already on the list keeps its row and only has `subscribed` set back to true, so a project never collects a second entry for one address. Repeating either call is harmless; an unknown token returns 404. Both endpoints are public by design, since recipients click them from their inbox with no credentials.
 
 ## Delivery behavior
 

@@ -63,3 +63,8 @@ type SwaggerAudienceResponse struct {
 	Message string            `json:"message"`
 	Data    []domain.Audience `json:"data"`
 }
+
+type SwaggerSubscriptionResponse struct {
+	Message string       `json:"message"`
+	Data    Subscription `json:"data"`
+}

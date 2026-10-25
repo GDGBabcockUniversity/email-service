@@ -16,3 +16,10 @@ type EmailStats struct {
 	Sent       int64 `json:"sent"`
 	Failed     int64 `json:"failed"`
 }
+
+// Subscription is the consent state reported by the unsubscribe endpoints.
+type Subscription struct {
+	Email      string `json:"email"`
+	ProjectID  string `json:"project_id"`
+	Subscribed bool   `json:"subscribed"`
+}

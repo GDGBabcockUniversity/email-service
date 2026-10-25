@@ -44,13 +44,15 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	keyRepo := postgres.NewApiKeyRepository(db)
 	emailRepo := postgres.NewEmailRepository(db)
 	audienceRepo := postgres.NewAudienceRepository(db)
-	projectService := services.NewProjectService(projectRepo, audienceRepo, postgres.OwnerID)
+	unsubscribeTokens := services.NewUnsubscribeTokens(cfg.UnsubscribeSecret, cfg.PublicBaseURL)
+	projectService := services.NewProjectService(projectRepo, audienceRepo, unsubscribeTokens, postgres.OwnerID)
 	templateService := services.NewTemplateService(projectRepo, templateRepo)
 	keyService := services.NewApiKeyService(keyRepo, projectRepo)
-	emailService := services.NewEmailService(emailRepo, audienceRepo, templateRepo, queue)
+	emailService := services.NewEmailService(emailRepo, audienceRepo, templateRepo, queue, unsubscribeTokens)
+	unsubscribeService := services.NewUnsubscribeService(audienceRepo, unsubscribeTokens)
 	consumer := services.NewEmailConsumer(emailRepo, smtp.NewSender(cfg))
 	webhookService := services.NewSanityService(cfg.WebhookSecret, cfg.WebhookSecret, emailService)
-	router := delivery.NewRouter(cfg.AdminApiKey, projectService, templateService, keyService, emailService, webhookService)
+	router := delivery.NewRouter(cfg.AdminApiKey, projectService, templateService, keyService, emailService, webhookService, unsubscribeService)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

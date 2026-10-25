@@ -226,6 +226,7 @@
                 <thead>
                   <tr>
                     <th scope="col">Email</th>
+                    <th scope="col">Status</th>
                     <th scope="col">Added</th>
                     <th scope="col" class="is-right">Action</th>
                   </tr>
@@ -409,7 +410,13 @@
               <input id="template-data" placeholder="name, ticket_id" />
             </label>
             <label class="field">
-              <span>HTML body</span>
+              <span
+                >HTML body
+                <span class="field__hint"
+                  >An Unsubscribe link is added at the end on save; move
+                  <code>{{ .UnsubscribeURL }}</code> to place it yourself</span
+                ></span
+              >
               <textarea id="template-content" class="is-code" required rows="14"></textarea>
             </label>
           </div>

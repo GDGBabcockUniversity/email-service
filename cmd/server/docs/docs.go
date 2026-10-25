@@ -1309,6 +1309,112 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/resubscribe": {
+            "post": {
+                "description": "Turns the same subscription back on using the token from its unsubscribe link. The existing audience entry is reused, never duplicated.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unsubscribe"
+                ],
+                "summary": "Resubscribe a recipient",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unsubscribe token from the email link",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SwaggerSubscriptionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/unsubscribe": {
+            "get": {
+                "description": "Public endpoint behind the unsubscribe link in every email. The token identifies one subscription; the matching audience entry is kept but marked unsubscribed, so sends to the whole audience skip it. Repeating the call is harmless.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unsubscribe"
+                ],
+                "summary": "Unsubscribe a recipient",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unsubscribe token from the email link",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SwaggerSubscriptionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1346,6 +1452,10 @@ const docTemplate = `{
                 },
                 "project_id": {
                     "type": "string"
+                },
+                "subscribed": {
+                    "description": "Subscribed is false once the recipient has used their unsubscribe link.\nSends to the whole audience skip these rows.",
+                    "type": "boolean"
                 }
             }
         },
@@ -1572,6 +1682,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.Subscription": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "project_id": {
+                    "type": "string"
+                },
+                "subscribed": {
+                    "type": "boolean"
+                }
+            }
+        },
         "dto.SwaggerAPIKeyData": {
             "type": "object",
             "properties": {
@@ -1694,6 +1818,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/domain.Project"
                     }
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SwaggerSubscriptionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/dto.Subscription"
                 },
                 "message": {
                     "type": "string"

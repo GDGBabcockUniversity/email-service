@@ -87,7 +87,7 @@ func (s *Sender) Send(ctx context.Context, email *domain.Email) error {
 		return err
 	}
 	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMessage-ID: <%s@gdg-email.local>\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n",
-		s.config.SMTPFrom, email.To, mime.QEncoding.Encode("utf-8", email.Subject), time.Now().UTC().Format(time.RFC1123Z), email.ID)
+		fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("utf-8", s.config.SMTPName), s.config.SMTPFrom), email.To, mime.QEncoding.Encode("utf-8", email.Subject), time.Now().UTC().Format(time.RFC1123Z), email.ID)
 	if _, err := writer.Write([]byte(headers)); err != nil {
 		return err
 	}

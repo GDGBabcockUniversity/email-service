@@ -19,14 +19,20 @@ import (
 	"github.com/GDGBabcockUnivsersity/email_service/web"
 )
 
-func NewRouter(adminKey string, projectService *services.ProjectService, templateService *services.TemplateService, apiKeyService *services.ApiKeyService, emailService *services.EmailService, sanityService *services.SanityService) *gin.Engine {
+func NewRouter(adminKey string, projectService *services.ProjectService, templateService *services.TemplateService, apiKeyService *services.ApiKeyService, emailService *services.EmailService, sanityService *services.SanityService, unsubscribeService *services.UnsubscribeService) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 	_ = router.SetTrustedProxies(nil)
 	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/swagger/doc.json"))
 	router.GET("/swagger/*any", swaggerHandler)
-	handler := NewHandler(projectService, templateService, apiKeyService, emailService, sanityService)
+	handler := NewHandler(projectService, templateService, apiKeyService, emailService, sanityService, unsubscribeService)
 	router.POST("/api/email", handler.authenticateEmail(), handler.sendEmail)
+
+	// Recipients click these from their inbox, so they carry no credentials: the
+	// unsubscribe token is the only thing that authorises the change.
+	router.GET("/api/unsubscribe", handler.unsubscribe)
+	router.POST("/api/unsubscribe", handler.unsubscribe)
+	router.POST("/api/resubscribe", handler.resubscribe)
 
 	router.POST("/sanity/webhook", handler.sanityWebhook)
 	admin := router.Group("/api", authenticateAdmin(adminKey))
@@ -89,6 +95,8 @@ func respondError(c *gin.Context, err error) {
 		status, message = http.StatusUnauthorized, domain.ErrUnauthorized.Error()
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrProjectNotFound):
 		status, message = http.StatusNotFound, "Resource Not Found"
+	case errors.Is(err, domain.ErrUnsubscribed):
+		status, message = http.StatusConflict, domain.ErrUnsubscribed.Error()
 	case errors.Is(err, domain.ErrConflict), errors.Is(err, domain.ErrDuplicateProjectName):
 		status, message = http.StatusConflict, "Resource Already Exists"
 	case errors.Is(err, domain.ErrUnavailable), errors.Is(err, context.DeadlineExceeded):

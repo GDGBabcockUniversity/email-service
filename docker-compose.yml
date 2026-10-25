@@ -6,15 +6,16 @@ services:
     environment:
       HTTP_ADDR: ":8080"
       GIN_MODE: release
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: postgres
+      DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
+      DB_PORT: ${DB_PORT:?Set DB_PORT in .env}
+      DB_USER: ${DB_USER:?Set DB_USER in .env}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-      DB_NAME: email_service
-      DB_SSLMODE: disable
+      DB_NAME: ${DB_NAME:?Set DB_NAME in .env}
+      DB_SSLMODE: ${DB_SSLMODE:?Set DB_SSLMODE in .env}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
       SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST in .env}
+      SMTP_NAME: ${SMTP_NAME}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
@@ -22,6 +23,8 @@ services:
       SMTP_TLS_MODE: ${SMTP_TLS_MODE:-starttls}
       SANITY_URL: ${SANITY_URL}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      UNSUBSCRIBE_SECRET: ${UNSUBSCRIBE_SECRET:?Set UNSUBSCRIBE_SECRET in .env}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
     depends_on:
       postgres:
         condition: service_healthy

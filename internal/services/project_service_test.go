@@ -32,7 +32,7 @@ func TestCreateProject_ValidRequest_ReturnsNoError(t *testing.T) {
 
 	projectRepo.On("Save", context.Background(), &project).Return(nil)
 
-	projectService := NewProjectService(projectRepo, audienceRepo, "owner-id")
+	projectService := NewProjectService(projectRepo, audienceRepo, NewUnsubscribeTokens("unsub-secret", "http://localhost:8080"), "owner-id")
 
 	_, err := projectService.CreateProject(context.Background(), &request)
 
@@ -57,7 +57,7 @@ func TestCreateProject_ExistingProjectName_ThrowsDuplicateProjectError(t *testin
 
 	projectRepo.On("ExistsByNameAndUserID", context.Background(), request.Name, mock.Anything).Return(true, nil)
 
-	projectService := NewProjectService(projectRepo, audienceRepo, "owner-id")
+	projectService := NewProjectService(projectRepo, audienceRepo, NewUnsubscribeTokens("unsub-secret", "http://localhost:8080"), "owner-id")
 
 	_, err := projectService.CreateProject(context.Background(), &request)
 

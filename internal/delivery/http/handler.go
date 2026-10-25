@@ -14,21 +14,23 @@ import (
 )
 
 type Handler struct {
-	projectService  *services.ProjectService
-	templateService *services.TemplateService
-	apiKeyService   *services.ApiKeyService
-	emailService    *services.EmailService
-	sanityService   *services.SanityService
+	projectService     *services.ProjectService
+	templateService    *services.TemplateService
+	apiKeyService      *services.ApiKeyService
+	emailService       *services.EmailService
+	sanityService      *services.SanityService
+	unsubscribeService *services.UnsubscribeService
 }
 
 // NewHandler creates an HTTP handler with the supplied services.
-func NewHandler(projectService *services.ProjectService, templateService *services.TemplateService, apiKeyService *services.ApiKeyService, emailService *services.EmailService, sanityService *services.SanityService) *Handler {
+func NewHandler(projectService *services.ProjectService, templateService *services.TemplateService, apiKeyService *services.ApiKeyService, emailService *services.EmailService, sanityService *services.SanityService, unsubscribeService *services.UnsubscribeService) *Handler {
 	return &Handler{
-		projectService:  projectService,
-		templateService: templateService,
-		apiKeyService:   apiKeyService,
-		emailService:    emailService,
-		sanityService:   sanityService,
+		projectService:     projectService,
+		templateService:    templateService,
+		apiKeyService:      apiKeyService,
+		emailService:       emailService,
+		sanityService:      sanityService,
+		unsubscribeService: unsubscribeService,
 	}
 }
 
@@ -564,4 +566,51 @@ func (h *Handler) removeAudience(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Recipient removed", Data: nil})
+}
+
+// unsubscribe godoc
+// @Summary Unsubscribe a recipient
+// @Description Public endpoint behind the unsubscribe link in every email. The token identifies one subscription; the matching audience entry is kept but marked unsubscribed, so sends to the whole audience skip it. Repeating the call is harmless.
+// @Tags Unsubscribe
+// @Produce json
+// @Param token query string true "Unsubscribe token from the email link"
+// @Success 200 {object} dto.SwaggerSubscriptionResponse
+// @Failure 400 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/unsubscribe [get]
+func (h *Handler) unsubscribe(c *gin.Context) {
+	audience, err := h.unsubscribeService.Unsubscribe(c.Request.Context(), c.Query("token"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Unsubscribed", Data: subscription(audience)})
+}
+
+// resubscribe godoc
+// @Summary Resubscribe a recipient
+// @Description Turns the same subscription back on using the token from its unsubscribe link. The existing audience entry is reused, never duplicated.
+// @Tags Unsubscribe
+// @Produce json
+// @Param token query string true "Unsubscribe token from the email link"
+// @Success 200 {object} dto.SwaggerSubscriptionResponse
+// @Failure 400 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/resubscribe [post]
+func (h *Handler) resubscribe(c *gin.Context) {
+	audience, err := h.unsubscribeService.Resubscribe(c.Request.Context(), c.Query("token"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Resubscribed", Data: subscription(audience)})
+}
+
+// subscription reports the consent state without leaking the stored token hash.
+func subscription(audience *domain.Audience) dto.Subscription {
+	return dto.Subscription{Email: audience.Email, ProjectID: audience.ProjectID, Subscribed: audience.Subscribed}
 }
