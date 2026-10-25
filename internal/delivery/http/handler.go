@@ -198,7 +198,7 @@ func (h *Handler) deleteProject(c *gin.Context) {
 // @Produce json
 // @Param projectId path string true "Project UUID"
 // @Param request body dto.CreateTemplateRequest true "Template subject, content, and example data"
-// @Success 201 {object} dto.Response
+// @Success 201 {object} dto.SwaggerTemplateResponse
 // @Failure 400 {object} dto.Response
 // @Failure 401 {object} dto.Response
 // @Failure 404 {object} dto.Response
@@ -226,7 +226,7 @@ func (h *Handler) createTemplate(c *gin.Context) {
 // @Security AdminKey
 // @Produce json
 // @Param projectId path string true "Project UUID"
-// @Success 200 {object} dto.Response
+// @Success 200 {object} dto.SwaggerTemplatesResponse
 // @Failure 401 {object} dto.Response
 // @Failure 404 {object} dto.Response
 // @Failure 503 {object} dto.Response
@@ -273,7 +273,7 @@ func (h *Handler) getTemplate(c *gin.Context) {
 // @Param projectId path string true "Project UUID"
 // @Param id path string true "Template UUID"
 // @Param request body dto.CreateTemplateRequest true "Updated template"
-// @Success 200 {object} dto.Response
+// @Success 200 {object} dto.SwaggerTemplateResponse
 // @Failure 400 {object} dto.Response
 // @Failure 401 {object} dto.Response
 // @Failure 404 {object} dto.Response

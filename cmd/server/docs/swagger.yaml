@@ -13,6 +13,40 @@ definitions:
       revoked_at:
         type: string
     type: object
+  domain.Audience:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      project_id:
+        type: string
+    type: object
+  domain.Email:
+    properties:
+      attempts:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      last_error:
+        type: string
+      project_id:
+        type: string
+      sent_at:
+        type: string
+      status:
+        $ref: '#/definitions/domain.Status'
+      subject:
+        type: string
+      template_id:
+        type: string
+      to:
+        type: string
+    type: object
   domain.Project:
     properties:
       created_at:
@@ -106,6 +140,19 @@ definitions:
     - name
     - subject
     type: object
+  dto.EmailStats:
+    properties:
+      failed:
+        type: integer
+      pending:
+        type: integer
+      processing:
+        type: integer
+      sent:
+        type: integer
+      total:
+        type: integer
+    type: object
   dto.Response:
     properties:
       data: {}
@@ -119,6 +166,7 @@ definitions:
           type: string
         type: object
       template:
+        maxLength: 200
         type: string
       to:
         maxLength: 254
@@ -164,6 +212,31 @@ definitions:
       data:
         items:
           $ref: '#/definitions/domain.ApiKey'
+        type: array
+      message:
+        type: string
+    type: object
+  dto.SwaggerAudienceResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Audience'
+        type: array
+      message:
+        type: string
+    type: object
+  dto.SwaggerEmailStatsResponse:
+    properties:
+      data:
+        $ref: '#/definitions/dto.EmailStats'
+      message:
+        type: string
+    type: object
+  dto.SwaggerEmailsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Email'
         type: array
       message:
         type: string
@@ -559,6 +632,41 @@ paths:
       tags:
       - API keys
   /api/projects/{projectId}/audience:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerAudienceResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: List a project's audience
+      tags:
+      - Audience
     post:
       parameters:
       - description: Project UUID
@@ -600,6 +708,186 @@ paths:
       summary: Add audience to a project
       tags:
       - Audience
+  /api/projects/{projectId}/audience/{id}:
+    delete:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Audience UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Remove a recipient from a project's audience
+      tags:
+      - Audience
+  /api/projects/{projectId}/emails:
+    get:
+      description: Returns the most recent emails for the project, newest first.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Filter by delivery status
+        enum:
+        - PENDING
+        - PROCESSING
+        - SENT
+        - FAILED
+        in: query
+        name: status
+        type: string
+      - description: Maximum emails to return (1-200, default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerEmailsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: List a project's emails
+      tags:
+      - Email
+    post:
+      consumes:
+      - application/json
+      description: Renders the named template and queues it. Set "to" to "all" to
+        reach every address in the project's audience, or to a single email address.
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      - description: Recipient, template name, and template data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SendEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/dto.SwaggerAcceptedEmailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Send one of a project's templates
+      tags:
+      - Email
+  /api/projects/{projectId}/emails/stats:
+    get:
+      parameters:
+      - description: Project UUID
+        in: path
+        name: projectId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerEmailStatsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - AdminKey: []
+      summary: Summarise a project's delivery outcomes
+      tags:
+      - Email
   /api/projects/{projectId}/templates:
     get:
       parameters:
