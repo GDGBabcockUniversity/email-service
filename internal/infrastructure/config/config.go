@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"net"
-	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -25,6 +24,7 @@ type Config struct {
 	SMTPUsername  string
 	SMTPPassword  string
 	SMTPFrom      string
+	SMTPName      string
 	SMTPTLSMode   string
 	SanityUrl     string
 	WebhookSecret string
@@ -46,6 +46,7 @@ func Load() (*Config, error) {
 		SMTPUsername:  getEnv("SMTP_USERNAME", ""),
 		SMTPPassword:  getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:      getEnv("SMTP_FROM", ""),
+		SMTPName:      getEnv("SMTP_NAME", ""),
 		SMTPTLSMode:   getEnv("SMTP_TLS_MODE", "starttls"),
 		SanityUrl:     getEnv("SANITY_URL", ""),
 		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
@@ -57,8 +58,8 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	if strings.TrimSpace(c.AdminApiKey) == "" || c.DBPassword == "" || c.SMTPHost == "" || c.SMTPFrom == "" {
-		return fmt.Errorf("DB_PASSWORD, ADMIN_API_KEY, SMTP_HOST and SMTP_FROM are required")
+	if strings.TrimSpace(c.AdminApiKey) == "" || c.DBPassword == "" || c.SMTPHost == "" || c.SMTPFrom == "" || c.SMTPName == "" {
+		return fmt.Errorf("DB_PASSWORD, ADMIN_API_KEY, SMTP_HOST, SMTP_NAME and SMTP_FROM are required")
 	}
 	for _, port := range []string{c.DBPort, c.SMTPPort} {
 		number, err := strconv.Atoi(port)
@@ -69,8 +70,7 @@ func (c *Config) Validate() error {
 	if _, _, err := net.SplitHostPort(c.HTTPAddr); err != nil {
 		return fmt.Errorf("invalid HTTP_ADDR: %w", err)
 	}
-	from, err := mail.ParseAddress(c.SMTPFrom)
-	if err != nil || from.Address != c.SMTPFrom || strings.ContainsAny(c.SMTPFrom, "\r\n") {
+	if strings.ContainsAny(c.SMTPFrom, "\r\n") {
 		return fmt.Errorf("SMTP_FROM must be a single email address")
 	}
 	switch c.SMTPTLSMode {
