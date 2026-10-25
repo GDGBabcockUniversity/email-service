@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="GDG">
+  <!-- The chapter chevrons: flat colour capsules inside hard black outlines. -->
+  <g stroke-linecap="round" fill="none">
+    <g stroke="#000" stroke-width="10">
+      <path d="M15 8 L9 16" />
+      <path d="M9 16 L15 24" />
+      <path d="M23 8 L29 16" />
+      <path d="M29 16 L23 24" />
+    </g>
+    <path d="M15 8 L9 16" stroke="#ea4335" stroke-width="6.5" />
+    <path d="M9 16 L15 24" stroke="#4285f4" stroke-width="6.5" />
+    <path d="M23 8 L29 16" stroke="#34a853" stroke-width="6.5" />
+    <path d="M29 16 L23 24" stroke="#f9ab00" stroke-width="6.5" />
+  </g>
+</svg>

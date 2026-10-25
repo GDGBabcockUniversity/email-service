@@ -56,3 +56,38 @@ func TestSendEmail_InvalidJSON_ReturnsBadRequest(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 	}
 }
+
+func TestAdminDashboard_ServesPageAndAssetsWithoutAdminKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewRouter("admin-secret", nil, nil, nil, nil, nil)
+	for path, want := range map[string]string{
+		"/admin":                               "text/html",
+		"/admin/static/css/dashboard.css":      "text/css",
+		"/admin/static/js/dashboard.js":        "javascript",
+		"/admin/static/img/gdg-logo.png":       "image/png",
+		"/admin/static/img/gdg-logo-light.png": "image/png",
+		"/admin/static/img/favicon.svg":        "image/svg+xml",
+	} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		assert.Equal(t, http.StatusOK, response.Code, path)
+		assert.Contains(t, response.Header().Get("Content-Type"), want, path)
+	}
+}
+
+func TestAdminDashboard_PageReferencesItsOwnAssets(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewRouter("admin-secret", nil, nil, nil, nil, nil)
+	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	body := response.Body.String()
+	for _, asset := range []string{
+		"/admin/static/css/dashboard.css",
+		"/admin/static/js/dashboard.js",
+		"/admin/static/img/gdg-logo-light.png",
+	} {
+		assert.Contains(t, body, asset)
+	}
+}

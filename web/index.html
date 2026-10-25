@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GDG Babcock email console</title>
+    <meta name="description" content="Admin console for the GDG Babcock University email service." />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/admin/static/img/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin/static/css/dashboard.css" />
+  </head>
+  <body>
+    <!-- Sign in ------------------------------------------------------ -->
+    <main class="gate" id="gate">
+      <div class="gate__card">
+        <img
+          class="gate__logo"
+          src="/admin/static/img/gdg-logo-light.png"
+          alt="Google Developer Group, Babcock University"
+        />
+        <h1 class="gate__title">Email console</h1>
+        <p class="gate__intro">
+          Track what the service has delivered, keep the member list current, and edit the
+          templates your projects send.
+        </p>
+        <form class="gate__form" id="gate-form">
+          <label class="field">
+            <span>Admin key</span>
+            <input
+              type="password"
+              id="gate-key"
+              name="key"
+              autocomplete="current-password"
+              required
+              placeholder="Paste your admin key"
+            />
+          </label>
+          <p class="notice notice--error" id="gate-error" hidden></p>
+          <button class="btn btn--primary" type="submit">Open the console</button>
+        </form>
+      </div>
+    </main>
+
+    <!-- Console ------------------------------------------------------ -->
+    <div class="shell" id="shell" hidden>
+      <header class="topbar">
+        <img
+          class="topbar__logo"
+          src="/admin/static/img/gdg-logo-light.png"
+          alt="Google Developer Group, Babcock University"
+        />
+        <div class="topbar__spacer"></div>
+        <div class="topbar__project">
+          <label for="project-picker">Project</label>
+          <select class="select" id="project-picker"></select>
+        </div>
+        <button class="btn btn--quiet" type="button" id="sign-out">Sign out</button>
+      </header>
+
+      <nav class="rail" aria-label="Console sections">
+        <div class="rail__nav" id="rail-nav">
+          <button class="navlink navlink--delivery" type="button" data-view="delivery">
+            Delivery
+          </button>
+          <button class="navlink navlink--audience" type="button" data-view="audience">
+            Audience
+          </button>
+          <button class="navlink navlink--templates" type="button" data-view="templates">
+            Templates
+          </button>
+          <button class="navlink navlink--projects" type="button" data-view="projects">
+            Projects
+          </button>
+        </div>
+        <div class="rail__foot">
+          <label class="toggle">
+            <input type="checkbox" id="auto-refresh" checked />
+            Refresh delivery every 10s
+          </label>
+          <span id="refresh-stamp">Not loaded yet</span>
+        </div>
+      </nav>
+
+      <main class="canvas">
+        <!-- Delivery ------------------------------------------------- -->
+        <section class="view" id="view-delivery">
+          <div class="view__head">
+            <div>
+              <h1 class="view__title">Delivery</h1>
+              <p class="view__note">
+                Every email this project has queued, and where each one got to.
+              </p>
+            </div>
+            <div class="view__actions">
+              <button class="btn btn--primary" type="button" id="send-new">Send an email</button>
+            </div>
+          </div>
+
+          <figure class="delivery">
+            <div
+              class="deliverybar deliverybar--empty"
+              id="delivery-bar"
+              role="img"
+              aria-label="Delivery breakdown"
+            >
+              <span class="deliverybar__seg deliverybar__seg--sent" data-status="SENT"></span>
+              <span
+                class="deliverybar__seg deliverybar__seg--processing"
+                data-status="PROCESSING"
+              ></span>
+              <span class="deliverybar__seg deliverybar__seg--pending" data-status="PENDING"></span>
+              <span class="deliverybar__seg deliverybar__seg--failed" data-status="FAILED"></span>
+            </div>
+            <figcaption class="tallies" id="tallies">
+              <div class="tally">
+                <div class="tally__value" data-tally="sent">0</div>
+                <div class="tally__label"><i class="dot dot--sent"></i>Sent</div>
+              </div>
+              <div class="tally">
+                <div class="tally__value" data-tally="processing">0</div>
+                <div class="tally__label"><i class="dot dot--processing"></i>Sending</div>
+              </div>
+              <div class="tally">
+                <div class="tally__value" data-tally="pending">0</div>
+                <div class="tally__label"><i class="dot dot--pending"></i>Queued</div>
+              </div>
+              <div class="tally">
+                <div class="tally__value" data-tally="failed">0</div>
+                <div class="tally__label"><i class="dot dot--failed"></i>Failed</div>
+              </div>
+            </figcaption>
+            <p class="delivery__total" id="delivery-total">No emails yet.</p>
+          </figure>
+
+          <div class="panel">
+            <div class="view__head">
+              <h2 class="panel__title">Recent emails</h2>
+              <div class="view__actions">
+                <select class="select" id="email-status" aria-label="Filter by status">
+                  <option value="">All statuses</option>
+                  <option value="SENT">Sent</option>
+                  <option value="PROCESSING">Sending</option>
+                  <option value="PENDING">Queued</option>
+                  <option value="FAILED">Failed</option>
+                </select>
+                <button class="btn" type="button" id="email-refresh">Refresh</button>
+              </div>
+            </div>
+            <div class="tablewrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Recipient</th>
+                    <th scope="col">Subject</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Attempts</th>
+                    <th scope="col">Queued</th>
+                    <th scope="col">Delivered</th>
+                  </tr>
+                </thead>
+                <tbody id="email-rows"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Audience ------------------------------------------------- -->
+        <section class="view" id="view-audience" hidden>
+          <div class="view__head">
+            <div>
+              <h1 class="view__title">Audience</h1>
+              <p class="view__note">
+                Everyone on this project's list. A send addressed to <code>all</code> reaches
+                exactly these people.
+              </p>
+            </div>
+          </div>
+
+          <form class="panel" id="audience-form">
+            <h2 class="panel__title">Add members</h2>
+            <label class="field" style="max-width: 20rem">
+              <span
+                >Add to project
+                <span class="field__hint">Switches the list below to match</span></span
+              >
+              <select id="audience-project"></select>
+            </label>
+            <label class="field">
+              <span
+                >Email addresses
+                <span class="field__hint">One per line, or separated by commas</span></span
+              >
+              <textarea
+                id="audience-input"
+                placeholder="ada@babcock.edu.ng&#10;grace@babcock.edu.ng"
+              ></textarea>
+            </label>
+            <div class="filters">
+              <button class="btn btn--primary" type="submit">Add to audience</button>
+              <span class="cell-faint" id="audience-parsed"></span>
+            </div>
+          </form>
+
+          <div class="panel">
+            <div class="view__head">
+              <h2 class="panel__title">On the list</h2>
+              <span class="cell-faint" id="audience-count"></span>
+              <div class="view__actions">
+                <input
+                  class="search"
+                  type="search"
+                  id="audience-search"
+                  placeholder="Find an address"
+                  aria-label="Find an address"
+                />
+              </div>
+            </div>
+            <div class="tablewrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Added</th>
+                    <th scope="col" class="is-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="audience-rows"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Templates ------------------------------------------------ -->
+        <section class="view" id="view-templates" hidden>
+          <div class="view__head">
+            <div>
+              <h1 class="view__title">Templates</h1>
+              <p class="view__note">
+                Subjects and HTML bodies this project can send. Values are filled in with Go
+                template syntax, so <code>{{.name}}</code> picks up the
+                <code>name</code> field from the send request.
+              </p>
+            </div>
+            <div class="view__actions">
+              <button class="btn btn--primary" type="button" id="template-new">New template</button>
+            </div>
+          </div>
+
+          <div class="tablewrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Subject</th>
+                  <th scope="col">Values</th>
+                  <th scope="col">Created</th>
+                  <th scope="col" class="is-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="template-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Projects ------------------------------------------------- -->
+        <section class="view" id="view-projects" hidden>
+          <div class="view__head">
+            <div>
+              <h1 class="view__title">Projects</h1>
+              <p class="view__note">
+                Each project has its own templates, audience, and API keys. Keys are what your apps
+                send in the <code>x-gdg_email-apikey</code> header.
+              </p>
+            </div>
+          </div>
+
+          <form class="panel" id="project-form">
+            <h2 class="panel__title">New project</h2>
+            <div class="formrow">
+              <label class="field">
+                <span>Name</span>
+                <input id="project-name" required maxlength="200" placeholder="DevFest 2026" />
+              </label>
+              <label class="field">
+                <span>Description</span>
+                <input
+                  id="project-description"
+                  maxlength="2000"
+                  placeholder="Ticketing and reminder mail"
+                />
+              </label>
+              <div><button class="btn btn--primary" type="submit">Create project</button></div>
+            </div>
+          </form>
+
+          <div class="panel">
+            <h2 class="panel__title">All projects</h2>
+            <div class="tablewrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Project ID</th>
+                    <th scope="col" class="is-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="project-rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="view__head">
+              <h2 class="panel__title">API keys for <span id="keys-project"></span></h2>
+              <div class="view__actions">
+                <button class="btn" type="button" id="key-new">Create key</button>
+              </div>
+            </div>
+            <div class="notice notice--key" id="key-reveal" hidden>
+              <strong>Copy this key now. It is not shown again.</strong>
+              <code id="key-value"></code>
+            </div>
+            <div class="tablewrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Key ID</th>
+                    <th scope="col">Created</th>
+                    <th scope="col">State</th>
+                    <th scope="col" class="is-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="key-rows"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Compose ------------------------------------------------------- -->
+    <dialog class="sheet sheet--narrow" id="send-sheet">
+      <form method="dialog" id="send-form">
+        <div class="sheet__head">
+          <h2 class="sheet__title">Send an email</h2>
+        </div>
+        <div class="sheet__body">
+          <label class="field">
+            <span>Template</span>
+            <select id="send-template"></select>
+          </label>
+          <label class="field">
+            <span>Send to</span>
+            <select id="send-audience">
+              <option value="all">Everyone on the audience list</option>
+              <option value="one">A single address</option>
+            </select>
+          </label>
+          <label class="field" id="send-address-field" hidden>
+            <span>Email address</span>
+            <input type="email" id="send-address" placeholder="ada@babcock.edu.ng" />
+          </label>
+          <div class="field" id="send-values"></div>
+          <p class="notice" id="send-hint" hidden></p>
+        </div>
+        <div class="sheet__foot">
+          <button class="btn btn--quiet" type="button" id="send-cancel">Cancel</button>
+          <button class="btn btn--primary" type="button" id="send-submit">Send</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Template editor ---------------------------------------------- -->
+    <dialog class="sheet" id="template-sheet">
+      <form method="dialog" id="template-form">
+        <div class="sheet__head">
+          <h2 class="sheet__title" id="template-sheet-title">New template</h2>
+        </div>
+        <div class="sheet__body">
+          <div class="editor">
+            <label class="field">
+              <span>Name</span>
+              <input id="template-name" required maxlength="200" placeholder="devfest-welcome" />
+            </label>
+            <label class="field">
+              <span
+                >Subject
+                <span class="field__hint">Values work here too</span></span
+              >
+              <input
+                id="template-subject"
+                required
+                maxlength="998"
+                placeholder="Welcome to DevFest, {{.name}}"
+              />
+            </label>
+            <label class="field">
+              <span
+                >Values
+                <span class="field__hint">Names the sender must supply, comma separated</span></span
+              >
+              <input id="template-data" placeholder="name, ticket_id" />
+            </label>
+            <label class="field">
+              <span>HTML body</span>
+              <textarea id="template-content" class="is-code" required rows="14"></textarea>
+            </label>
+          </div>
+          <div class="preview">
+            <span class="field__hint">Preview, with sample values filled in</span>
+            <iframe
+              class="preview__frame"
+              id="template-preview"
+              title="Template preview"
+              sandbox
+            ></iframe>
+          </div>
+        </div>
+        <div class="sheet__foot">
+          <button class="btn btn--quiet" type="button" id="template-cancel">Cancel</button>
+          <button class="btn btn--primary" type="button" id="template-save">Save template</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/admin/static/js/dashboard.js"></script>
+  </body>
+</html>
