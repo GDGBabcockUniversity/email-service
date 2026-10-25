@@ -9,4 +9,6 @@ type Audience struct {
 	Email     string    `gorm:"type:text" json:"email"`
 	CreatedAt time.Time `gorm:"type:timestamptz" json:"created_at"`
 	ProjectID string    `gorm:"type:uuid" json:"project_id"`
+	Subscribed bool `gorm:"not null;default:true" json:"subscribed"`
+	UnsubscribeToken string `gorm:"type:text;index" json:"-"`
 }

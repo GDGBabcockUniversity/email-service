@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
@@ -11,11 +12,12 @@ import (
 type ProjectService struct {
 	projectRepo  domain.ProjectRepository
 	audienceRepo domain.AudienceRepository
+	tokens       *UnsubscribeTokens
 	ownerID      string
 }
 
-func NewProjectService(projectRepo domain.ProjectRepository, audienceRepo domain.AudienceRepository, ownerID string) *ProjectService {
-	return &ProjectService{projectRepo: projectRepo, audienceRepo: audienceRepo, ownerID: ownerID}
+func NewProjectService(projectRepo domain.ProjectRepository, audienceRepo domain.AudienceRepository, tokens *UnsubscribeTokens, ownerID string) *ProjectService {
+	return &ProjectService{projectRepo: projectRepo, audienceRepo: audienceRepo, tokens: tokens, ownerID: ownerID}
 }
 
 func (s *ProjectService) CreateProject(ctx context.Context, request *dto.CreateProjectRequest) (*domain.Project, error) {
@@ -63,12 +65,44 @@ func (s *ProjectService) DeleteProject(ctx context.Context, id string) error {
 	return s.projectRepo.DeleteById(ctx, id)
 }
 
+// AddAudience subscribes addresses to a project. An address already on the list
+// keeps its row: adding it again only turns its subscription back on, so a
+// resubscribe never leaves the project with a duplicate audience entry.
 func (s *ProjectService) AddAudience(ctx context.Context, projectID string, audience dto.AddAudienceRequest) error {
 
 	var audiences []domain.Audience
+	seen := map[string]bool{}
 
 	for _, a := range audience.Audiences {
-		audiences = append(audiences, domain.Audience{Email: a.Email, ProjectID: projectID})
+		email := normalizeEmail(a.Email)
+		if seen[email] {
+			continue
+		}
+		seen[email] = true
+
+		existing, err := s.audienceRepo.FindByEmailAndProjectID(ctx, email, projectID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			return err
+		}
+		if existing != nil {
+			if !existing.Subscribed {
+				if err := s.audienceRepo.SetSubscribed(ctx, existing.ID, true); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		audiences = append(audiences, domain.Audience{
+			Email:            email,
+			ProjectID:        projectID,
+			Subscribed:       true,
+			UnsubscribeToken: s.tokens.HashFor(projectID, email),
+		})
+	}
+
+	if len(audiences) == 0 {
+		return nil
 	}
 
 	if err := s.audienceRepo.SaveAll(ctx, audiences); err != nil {

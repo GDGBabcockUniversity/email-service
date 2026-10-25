@@ -28,6 +28,12 @@ type Config struct {
 	SMTPTLSMode   string
 	SanityUrl     string
 	WebhookSecret string
+	// UnsubscribeSecret signs the per-subscription unsubscribe tokens. Changing
+	// it invalidates every unsubscribe link already sent out.
+	UnsubscribeSecret string
+	// PublicBaseURL is the externally reachable origin used to build the
+	// unsubscribe links embedded in emails.
+	PublicBaseURL string
 }
 
 func Load() (*Config, error) {
@@ -50,6 +56,9 @@ func Load() (*Config, error) {
 		SMTPTLSMode:   getEnv("SMTP_TLS_MODE", "starttls"),
 		SanityUrl:     getEnv("SANITY_URL", ""),
 		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
+
+		UnsubscribeSecret: getEnv("UNSUBSCRIBE_SECRET", ""),
+		PublicBaseURL:     getEnv("PUBLIC_BASE_URL", "http://localhost:8080"),
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -60,6 +69,12 @@ func Load() (*Config, error) {
 func (c *Config) Validate() error {
 	if strings.TrimSpace(c.AdminApiKey) == "" || c.DBPassword == "" || c.SMTPHost == "" || c.SMTPFrom == "" || c.SMTPName == "" {
 		return fmt.Errorf("DB_PASSWORD, ADMIN_API_KEY, SMTP_HOST, SMTP_NAME and SMTP_FROM are required")
+	}
+	if strings.TrimSpace(c.UnsubscribeSecret) == "" {
+		return fmt.Errorf("UNSUBSCRIBE_SECRET is required")
+	}
+	if base, err := url.Parse(c.PublicBaseURL); err != nil || base.Scheme == "" || base.Host == "" {
+		return fmt.Errorf("PUBLIC_BASE_URL must be an absolute URL, for example https://mail.example.com")
 	}
 	for _, port := range []string{c.DBPort, c.SMTPPort} {
 		number, err := strconv.Atoi(port)

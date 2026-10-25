@@ -10,4 +10,5 @@ var (
 	ErrInvalidRequest       = errors.New("Invalid Request")
 	ErrUnauthorized         = errors.New("Unauthorized")
 	ErrUnavailable          = errors.New("Service Unavailable")
+	ErrUnsubscribed         = errors.New("Recipient Has Unsubscribed")
 )

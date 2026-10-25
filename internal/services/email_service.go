@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/mail"
@@ -13,26 +14,27 @@ import (
 )
 
 type EmailService struct {
-	emailRepo       domain.EmailRepository
-	audienceRepo    domain.AudienceRepository
+	emailRepo    domain.EmailRepository
+	audienceRepo domain.AudienceRepository
 	templateRepo domain.TemplateRepository
-	publisher       domain.Publisher
+	publisher    domain.Publisher
+	tokens       *UnsubscribeTokens
 }
 
-func NewEmailService(emailRepo domain.EmailRepository, audienceRepo domain.AudienceRepository, templateRepo domain.TemplateRepository, publisher domain.Publisher) *EmailService {
-	return &EmailService{emailRepo: emailRepo, audienceRepo: audienceRepo, templateRepo: templateRepo, publisher: publisher}
+func NewEmailService(emailRepo domain.EmailRepository, audienceRepo domain.AudienceRepository, templateRepo domain.TemplateRepository, publisher domain.Publisher, tokens *UnsubscribeTokens) *EmailService {
+	return &EmailService{emailRepo: emailRepo, audienceRepo: audienceRepo, templateRepo: templateRepo, publisher: publisher, tokens: tokens}
 }
 
 func (s *EmailService) SendEmail(ctx context.Context, projectID string, request *dto.SendEmailRequest) ([]*domain.Email, error) {
 
 	if request.To != "all" {
 		address, err := mail.ParseAddress(request.To)
-	
+
 		if err != nil || address.Address != request.To || strings.ContainsAny(request.To, "\r\n") {
 			return nil, domain.ErrInvalidRequest
 		}
 	}
-	
+
 	record, err := s.templateRepo.FindByNameAndProjectID(ctx, request.Template, projectID)
 	if err != nil {
 		return nil, err
@@ -41,24 +43,31 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 	if record == nil {
 		return nil, domain.ErrNotFound
 	}
-	
-	subject, body, err := renderTemplate(record, request.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	audiences, err := s.audienceRepo.FindByProjectID(ctx, projectID)
-
-	slog.Info("audiences", "AUD", audiences)
-
-	if err != nil {
-		return nil, err
-	}
 
 	if request.To == "all" {
 
-		var emails []*domain.Email
+		// Only recipients who still consent; unsubscribed rows stay in the
+		// audience but are never sent to again.
+		audiences, err := s.audienceRepo.FindSubscribedByProjectID(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+
+		slog.Info("audiences", "AUD", audiences)
+
+		emails := []*domain.Email{}
 		for _, audience := range audiences {
+
+			if err := s.ensureUnsubscribeToken(ctx, &audience); err != nil {
+				return nil, err
+			}
+
+			// Each recipient's body carries their own unsubscribe link, so the
+			// template has to be rendered per address rather than once.
+			subject, body, err := renderTemplate(record, s.recipientData(request.Data, projectID, audience.Email))
+			if err != nil {
+				return nil, err
+			}
 
 			email := &domain.Email{
 				To:         audience.Email,
@@ -71,18 +80,8 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 
 			emails = append(emails, email)
 
-			if err := s.emailRepo.Save(ctx, email); err != nil {
+			if err := s.queue(ctx, email); err != nil {
 				return nil, err
-			}
-			if err := s.publisher.Publish(ctx, email.ID); err != nil {
-				email.Status, email.LastError = domain.StatusFailed, "Queue publication failed"
-				// Persist failure even when the requesting client has disconnected.
-				failureCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-				defer cancel()
-				if updateErr := s.emailRepo.Update(failureCtx, email); updateErr != nil {
-					return nil, fmt.Errorf("%w: queue publication and failure persistence failed", domain.ErrUnavailable)
-				}
-				return nil, domain.ErrUnavailable
 			}
 
 		}
@@ -90,6 +89,27 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 		return emails, nil
 
 	}
+
+	// A one-off send still has to honour an unsubscribe: if this address is on
+	// the project's audience and has opted out, refuse rather than deliver.
+	audience, err := s.audienceRepo.FindByEmailAndProjectID(ctx, request.To, projectID)
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return nil, err
+	}
+	if audience != nil {
+		if !audience.Subscribed {
+			return nil, domain.ErrUnsubscribed
+		}
+		if err := s.ensureUnsubscribeToken(ctx, audience); err != nil {
+			return nil, err
+		}
+	}
+
+	subject, body, err := renderTemplate(record, s.recipientData(request.Data, projectID, audienceEmail(audience)))
+	if err != nil {
+		return nil, err
+	}
+
 	email := &domain.Email{
 		To:         request.To,
 		ProjectID:  projectID,
@@ -99,8 +119,17 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 		Status:     domain.StatusPending,
 	}
 
-	if err := s.emailRepo.Save(ctx, email); err != nil {
+	if err := s.queue(ctx, email); err != nil {
 		return nil, err
+	}
+	return []*domain.Email{email}, nil
+}
+
+// queue persists an email and publishes it, marking the row failed if the queue
+// rejects it so a dropped job is never silently reported as pending.
+func (s *EmailService) queue(ctx context.Context, email *domain.Email) error {
+	if err := s.emailRepo.Save(ctx, email); err != nil {
+		return err
 	}
 	if err := s.publisher.Publish(ctx, email.ID); err != nil {
 		email.Status, email.LastError = domain.StatusFailed, "Queue publication failed"
@@ -108,12 +137,54 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 		failureCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if updateErr := s.emailRepo.Update(failureCtx, email); updateErr != nil {
-			return nil, fmt.Errorf("%w: queue publication and failure persistence failed", domain.ErrUnavailable)
+			return fmt.Errorf("%w: queue publication and failure persistence failed", domain.ErrUnavailable)
 		}
-		return nil, domain.ErrUnavailable
+		return domain.ErrUnavailable
 	}
-	return []*domain.Email{email}, nil
+	return nil
 }
+
+// recipientData copies the caller's template data and adds the recipient's
+// unsubscribe link, so templates can use {{ .UnsubscribeURL }}. The key is
+// always present (empty for an address that holds no subscription) because
+// templates render with missingkey=error.
+func (s *EmailService) recipientData(data map[string]string, projectID, email string) map[string]string {
+	merged := make(map[string]string, len(data)+1)
+	for key, value := range data {
+		merged[key] = value
+	}
+	link := ""
+	if email != "" && s.tokens != nil {
+		link = s.tokens.URL(projectID, email)
+	}
+	merged["UnsubscribeURL"] = link
+	return merged
+}
+
+// ensureUnsubscribeToken backfills the stored token hash for subscriptions added
+// before unsubscribe links existed, so their links resolve on the first click.
+func (s *EmailService) ensureUnsubscribeToken(ctx context.Context, audience *domain.Audience) error {
+	if s.tokens == nil {
+		return nil
+	}
+	expected := s.tokens.HashFor(audience.ProjectID, audience.Email)
+	if audience.UnsubscribeToken == expected {
+		return nil
+	}
+	if err := s.audienceRepo.SetUnsubscribeToken(ctx, audience.ID, expected); err != nil {
+		return err
+	}
+	audience.UnsubscribeToken = expected
+	return nil
+}
+
+func audienceEmail(audience *domain.Audience) string {
+	if audience == nil {
+		return ""
+	}
+	return audience.Email
+}
+
 // ListEmails returns a project's most recent emails for the admin dashboard,
 // optionally narrowed to one delivery status.
 func (s *EmailService) ListEmails(ctx context.Context, projectID, status string, limit int) ([]domain.Email, error) {
