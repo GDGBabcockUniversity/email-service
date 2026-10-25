@@ -8,6 +8,10 @@
   const KEY_STORE = "gdg.email.adminKey";
   const PROJECT_STORE = "gdg.email.projectId";
   const REFRESH_MS = 10000;
+  // Footer the service fills in per recipient. Every template gets one so no
+  // send goes out without a way for the reader to opt back out.
+  const UNSUBSCRIBE_FOOTER =
+    '<p><a href="{{ .UnsubscribeURL }}">Unsubscribe</a></p>';
 
   const state = {
     key: "",
@@ -363,7 +367,7 @@
     if (!requireProject()) {
       fill(
         $("audience-rows"),
-        emptyRow(3, "No project selected", "Create a project before building an audience."),
+        emptyRow(4, "No project selected", "Create a project before building an audience."),
       );
       return;
     }
@@ -386,8 +390,8 @@
       fill(
         $("audience-rows"),
         term
-          ? emptyRow(3, "No match", `Nothing on the list contains “${term}”.`)
-          : emptyRow(3, "No one on the list yet", "Paste addresses above to add your first members."),
+          ? emptyRow(4, "No match", `Nothing on the list contains “${term}”.`)
+          : emptyRow(4, "No one on the list yet", "Paste addresses above to add your first members."),
       );
       return;
     }
@@ -398,6 +402,10 @@
           "tr",
           {},
           el("td", { class: "cell-mono", text: person.email }),
+          el("td", {
+            class: person.subscribed === false ? "cell-faint" : "",
+            text: person.subscribed === false ? "Unsubscribed" : "Subscribed",
+          }),
           el("td", {
             class: "cell-faint",
             title: exactly(person.created_at),
@@ -646,9 +654,11 @@
     $("template-name").value = template ? template.name : "";
     $("template-subject").value = template ? template.subject : "";
     $("template-data").value = template ? (template.data || []).join(", ") : "";
-    $("template-content").value = template
-      ? template.content
-      : '<h1>Hello {{.name}}</h1>\n<p>Welcome to the chapter.</p>';
+    $("template-content").value = withUnsubscribe(
+      template
+        ? template.content
+        : '<h1>Hello {{.name}}</h1>\n<p>Welcome to the chapter.</p>',
+    );
     updatePreview();
     $("template-sheet").showModal();
   }
@@ -683,14 +693,24 @@
     );
   }
 
+  // Appends the unsubscribe link unless the body already places it somewhere
+  // of its own, so an author can move the link but not drop it.
+  function withUnsubscribe(content) {
+    if (/\{\{\s*\.UnsubscribeURL\s*\}\}/.test(content)) return content;
+    return content.replace(/\s*$/, "") + "\n" + UNSUBSCRIBE_FOOTER;
+  }
+
   async function saveTemplate() {
     const name = $("template-name").value.trim();
     const subject = $("template-subject").value.trim();
-    const content = $("template-content").value;
-    if (!name || !subject || !content.trim()) {
+    if (!name || !subject || !$("template-content").value.trim()) {
       toast("Name, subject, and body are all required.", true);
       return;
     }
+    // Written back so the editor and preview show exactly what was stored.
+    const content = withUnsubscribe($("template-content").value);
+    $("template-content").value = content;
+    updatePreview();
     const data = $("template-data")
       .value.split(",")
       .map((value) => value.trim())
