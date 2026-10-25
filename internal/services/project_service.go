@@ -77,3 +77,21 @@ func (s *ProjectService) AddAudience(ctx context.Context, projectID string, audi
 
 	return nil
 }
+
+func (s *ProjectService) ListAudience(ctx context.Context, projectID string) ([]domain.Audience, error) {
+	if _, err := s.projectRepo.FindByID(ctx, projectID); err != nil {
+		return nil, err
+	}
+	return s.audienceRepo.FindByProjectID(ctx, projectID)
+}
+
+func (s *ProjectService) RemoveAudience(ctx context.Context, projectID, audienceID string) error {
+	audience, err := s.audienceRepo.FindByID(ctx, audienceID)
+	if err != nil {
+		return err
+	}
+	if audience == nil || audience.ProjectID != projectID {
+		return domain.ErrNotFound
+	}
+	return s.audienceRepo.DeleteByID(ctx, audienceID)
+}

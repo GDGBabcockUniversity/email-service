@@ -48,3 +48,18 @@ type SwaggerAcceptedEmailResponse struct {
 	Message string                   `json:"message"`
 	Data    SwaggerAcceptedEmailData `json:"data"`
 }
+
+type SwaggerEmailsResponse struct {
+	Message string         `json:"message"`
+	Data    []domain.Email `json:"data"`
+}
+
+type SwaggerEmailStatsResponse struct {
+	Message string     `json:"message"`
+	Data    EmailStats `json:"data"`
+}
+
+type SwaggerAudienceResponse struct {
+	Message string            `json:"message"`
+	Data    []domain.Audience `json:"data"`
+}

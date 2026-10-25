@@ -114,3 +114,36 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 	}
 	return []*domain.Email{email}, nil
 }
+// ListEmails returns a project's most recent emails for the admin dashboard,
+// optionally narrowed to one delivery status.
+func (s *EmailService) ListEmails(ctx context.Context, projectID, status string, limit int) ([]domain.Email, error) {
+	filter := domain.Status(strings.ToUpper(strings.TrimSpace(status)))
+	switch filter {
+	case "", domain.StatusPending, domain.StatusProcessing, domain.StatusSent, domain.StatusFailed:
+	default:
+		return nil, domain.ErrInvalidRequest
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	return s.emailRepo.FindByProjectID(ctx, projectID, filter, limit)
+}
+
+// EmailStats tallies a project's delivery outcomes, always reporting every status.
+func (s *EmailService) EmailStats(ctx context.Context, projectID string) (*dto.EmailStats, error) {
+	counts, err := s.emailRepo.CountByStatus(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	stats := &dto.EmailStats{
+		Pending:    counts[domain.StatusPending],
+		Processing: counts[domain.StatusProcessing],
+		Sent:       counts[domain.StatusSent],
+		Failed:     counts[domain.StatusFailed],
+	}
+	stats.Total = stats.Pending + stats.Processing + stats.Sent + stats.Failed
+	return stats, nil
+}

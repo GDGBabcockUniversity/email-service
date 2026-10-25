@@ -42,6 +42,11 @@ func NewRouter(adminKey string, projectService *services.ProjectService, templat
 	admin.GET("/projects/:projectId/api-keys", handler.listKeys)
 	admin.DELETE("/projects/:projectId/api-keys/:id", handler.revokeKey)
 	admin.POST("/projects/:projectId/audience", handler.addAudience)
+	admin.GET("/projects/:projectId/audience", handler.listAudience)
+	admin.DELETE("/projects/:projectId/audience/:id", handler.removeAudience)
+	admin.POST("/projects/:projectId/emails", handler.sendProjectEmail)
+	admin.GET("/projects/:projectId/emails", handler.listEmails)
+	admin.GET("/projects/:projectId/emails/stats", handler.emailStats)
 	router.NoRoute(func(c *gin.Context) {
 		respondError(c, domain.ErrNotFound)
 	})

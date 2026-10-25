@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/domain"
@@ -57,13 +58,16 @@ func (h *Handler) sendEmail(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	c.JSON(http.StatusAccepted, dto.ApiResponse[any]{Message: "Email accepted", Data: queued(emails)})
+}
 
-	emailResponse := []map[string]string{}
-
+// queued summarises the rows a send created, in the order they were accepted.
+func queued(emails []*domain.Email) []map[string]string {
+	summary := []map[string]string{}
 	for _, email := range emails {
-		emailResponse = append(emailResponse, map[string]string{"id": email.ID, "status": string(email.Status)})
+		summary = append(summary, map[string]string{"id": email.ID, "status": string(email.Status)})
 	}
-	c.JSON(http.StatusAccepted, dto.ApiResponse[any]{Message: "Email accepted", Data: emailResponse})
+	return summary
 }
 
 // createProject godoc
@@ -437,4 +441,127 @@ func (h *Handler) sanityWebhook(c *gin.Context) {
 
 	_ = h.sanityService.Webhook(c.Request.Context(), projectID, sanityWebhookRequest)
 	c.JSON(http.StatusOK, map[string]string{"status": "done"})
+}
+
+// sendProjectEmail godoc
+// @Summary Send one of a project's templates
+// @Description Renders the named template and queues it. Set "to" to "all" to reach every address in the project's audience, or to a single email address.
+// @Tags Email
+// @Security AdminKey
+// @Accept json
+// @Produce json
+// @Param projectId path string true "Project UUID"
+// @Param request body dto.SendEmailRequest true "Recipient, template name, and template data"
+// @Success 202 {object} dto.SwaggerAcceptedEmailResponse
+// @Failure 400 {object} dto.Response
+// @Failure 401 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/projects/{projectId}/emails [post]
+func (h *Handler) sendProjectEmail(c *gin.Context) {
+	var request dto.SendEmailRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		respondError(c, domain.ErrInvalidRequest)
+		return
+	}
+	emails, err := h.emailService.SendEmail(c.Request.Context(), c.Param("projectId"), &request)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, dto.ApiResponse[any]{Message: "Email accepted", Data: queued(emails)})
+}
+
+// listEmails godoc
+// @Summary List a project's emails
+// @Description Returns the most recent emails for the project, newest first.
+// @Tags Email
+// @Security AdminKey
+// @Produce json
+// @Param projectId path string true "Project UUID"
+// @Param status query string false "Filter by delivery status" Enums(PENDING, PROCESSING, SENT, FAILED)
+// @Param limit query int false "Maximum emails to return (1-200, default 50)"
+// @Success 200 {object} dto.SwaggerEmailsResponse
+// @Failure 400 {object} dto.Response
+// @Failure 401 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/projects/{projectId}/emails [get]
+func (h *Handler) listEmails(c *gin.Context) {
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if err != nil {
+		respondError(c, domain.ErrInvalidRequest)
+		return
+	}
+	emails, err := h.emailService.ListEmails(c.Request.Context(), c.Param("projectId"), c.Query("status"), limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Emails retrieved", Data: emails})
+}
+
+// emailStats godoc
+// @Summary Summarise a project's delivery outcomes
+// @Tags Email
+// @Security AdminKey
+// @Produce json
+// @Param projectId path string true "Project UUID"
+// @Success 200 {object} dto.SwaggerEmailStatsResponse
+// @Failure 401 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/projects/{projectId}/emails/stats [get]
+func (h *Handler) emailStats(c *gin.Context) {
+	stats, err := h.emailService.EmailStats(c.Request.Context(), c.Param("projectId"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Email stats retrieved", Data: stats})
+}
+
+// listAudience godoc
+// @Summary List a project's audience
+// @Tags Audience
+// @Security AdminKey
+// @Produce json
+// @Param projectId path string true "Project UUID"
+// @Success 200 {object} dto.SwaggerAudienceResponse
+// @Failure 401 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/projects/{projectId}/audience [get]
+func (h *Handler) listAudience(c *gin.Context) {
+	audiences, err := h.projectService.ListAudience(c.Request.Context(), c.Param("projectId"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Audience retrieved", Data: audiences})
+}
+
+// removeAudience godoc
+// @Summary Remove a recipient from a project's audience
+// @Tags Audience
+// @Security AdminKey
+// @Produce json
+// @Param projectId path string true "Project UUID"
+// @Param id path string true "Audience UUID"
+// @Success 200 {object} dto.Response
+// @Failure 401 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 503 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /api/projects/{projectId}/audience/{id} [delete]
+func (h *Handler) removeAudience(c *gin.Context) {
+	if err := h.projectService.RemoveAudience(c.Request.Context(), c.Param("projectId"), c.Param("id")); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.ApiResponse[any]{Message: "Recipient removed", Data: nil})
 }

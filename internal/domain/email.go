@@ -11,7 +11,7 @@ type Email struct {
 	Body          string     `gorm:"type:text;not null" json:"-"`
 	Status        Status     `gorm:"not null" json:"status"`
 	Attempts      int        `gorm:"not null;default:0" json:"attempts"`
-	LastError     string     `json:"-"`
+	LastError     string     `json:"last_error,omitempty"`
 	NextAttemptAt *time.Time `json:"-"`
 	CreatedAt     time.Time  `json:"created_at"`
 	SentAt        *time.Time `json:"sent_at"`

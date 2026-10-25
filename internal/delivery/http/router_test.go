@@ -17,13 +17,23 @@ import (
 func TestManagement_MissingOrWrongAdminKey_ReturnsUnauthorized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := NewRouter("admin-secret", nil, nil, nil, nil, nil)
-	for _, key := range []string{"", "wrong"} {
-		request := httptest.NewRequest(http.MethodGet, "/api/projects", nil)
-		request.Header.Set("X-Admin-Key", key)
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-		assert.Equal(t, http.StatusUnauthorized, response.Code)
-		assert.JSONEq(t, `{"message":"Unauthorized","data":null}`, response.Body.String())
+	routes := []struct{ method, path string }{
+		{http.MethodGet, "/api/projects"},
+		{http.MethodGet, "/api/projects/p/audience"},
+		{http.MethodDelete, "/api/projects/p/audience/a"},
+		{http.MethodGet, "/api/projects/p/emails"},
+		{http.MethodGet, "/api/projects/p/emails/stats"},
+		{http.MethodPost, "/api/projects/p/emails"},
+	}
+	for _, route := range routes {
+		for _, key := range []string{"", "wrong"} {
+			request := httptest.NewRequest(route.method, route.path, nil)
+			request.Header.Set("X-Admin-Key", key)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			assert.Equal(t, http.StatusUnauthorized, response.Code, route.path)
+			assert.JSONEq(t, `{"message":"Unauthorized","data":null}`, response.Body.String())
+		}
 	}
 }
 

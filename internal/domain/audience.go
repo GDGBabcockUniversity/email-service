@@ -5,8 +5,8 @@ import (
 )
 
 type Audience struct {
-	ID        string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Email     string    `gorm:"type:text"`
-	CreatedAt time.Time `gorm:"type:timestamptz"`
-	ProjectID string    `gorm:"type:uuid"`
+	ID        string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Email     string    `gorm:"type:text" json:"email"`
+	CreatedAt time.Time `gorm:"type:timestamptz" json:"created_at"`
+	ProjectID string    `gorm:"type:uuid" json:"project_id"`
 }
