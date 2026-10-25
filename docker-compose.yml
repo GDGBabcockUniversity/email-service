@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      HTTP_ADDR: ":8080"
+      PORT: ${PORT:-:8080}
       GIN_MODE: release
       DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
       DB_PORT: ${DB_PORT:?Set DB_PORT in .env}

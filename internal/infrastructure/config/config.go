@@ -36,6 +36,19 @@ type Config struct {
 	PublicBaseURL string
 }
 
+// listenAddr accepts both forms of PORT: hosts inject a bare number, while a
+// local .env usually carries ":8080" or an explicit host:port.
+func listenAddr(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ":8080"
+	}
+	if !strings.Contains(value, ":") {
+		return ":" + value
+	}
+	return value
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{
 		DBHost:        getEnv("DB_HOST", "localhost"),
@@ -82,6 +95,9 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid database or SMTP port")
 		}
 	}
+	// Normalised here so every caller of Validate ends up with an address the
+	// HTTP server can actually listen on.
+	c.Port = listenAddr(c.Port)
 	if _, _, err := net.SplitHostPort(c.Port); err != nil {
 		return fmt.Errorf("invalid PORT: %w", err)
 	}

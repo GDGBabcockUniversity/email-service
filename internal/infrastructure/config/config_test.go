@@ -22,3 +22,24 @@ func TestDatabaseURL_EscapesCredentialsAndUsesConfiguredPort(t *testing.T) {
 	assert.Equal(t, "require", value.Query().Get("sslmode"))
 	assert.Equal(t, "UTC", value.Query().Get("timezone"))
 }
+
+// Hosts inject PORT as a bare number, which is not a listen address on its own.
+func TestValidate_NormalisesPortIntoAListenAddress(t *testing.T) {
+	for value, expected := range map[string]string{
+		"8080":         ":8080",
+		":9000":        ":9000",
+		"0.0.0.0:8080": "0.0.0.0:8080",
+		" 3000 ":       ":3000",
+		"":             ":8080",
+	} {
+		cfg := &Config{
+			AdminApiKey: "admin", DBPassword: "secret", DBPort: "5432", DBSSLMode: "disable",
+			SMTPHost: "smtp.example.com", SMTPPort: "587", SMTPFrom: "gdg@example.com",
+			SMTPName: "GDG Babcock", SMTPUsername: "user", SMTPPassword: "pass",
+			SMTPTLSMode: "starttls", UnsubscribeSecret: "unsub", PublicBaseURL: "https://mail.example.com",
+			Port: value,
+		}
+		require.NoError(t, cfg.Validate(), "PORT=%q", value)
+		assert.Equal(t, expected, cfg.Port, "PORT=%q", value)
+	}
+}
