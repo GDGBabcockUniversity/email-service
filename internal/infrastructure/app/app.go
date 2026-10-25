@@ -55,7 +55,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	router := delivery.NewRouter(cfg.AdminApiKey, projectService, templateService, keyService, emailService, webhookService, unsubscribeService)
 
 	server := &http.Server{
-		Addr:              cfg.HTTPAddr,
+		Addr:              cfg.Port,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       20 * time.Second,
@@ -75,7 +75,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		serverError <- server.ListenAndServe()
 	}()
 
-	slog.Info("Email service started", "address", cfg.HTTPAddr)
+	slog.Info("Email service started", "address", cfg.Port)
 	var runErr error
 	select {
 	case <-ctx.Done():

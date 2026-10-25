@@ -17,7 +17,7 @@ type Config struct {
 	DBName        string
 	DBSSLMode     string
 	REDIS_URL     string
-	HTTPAddr      string
+	Port          string
 	AdminApiKey   string
 	SMTPHost      string
 	SMTPPort      string
@@ -45,7 +45,7 @@ func Load() (*Config, error) {
 		DBName:        getEnv("DB_NAME", "email_service"),
 		DBSSLMode:     getEnv("DB_SSLMODE", "disable"),
 		REDIS_URL:     getEnv("REDIS_URL", "redis://localhost:6379/0"),
-		HTTPAddr:      getEnv("HTTP_ADDR", ":8080"),
+		Port:          getEnv("PORT", ":8080"),
 		AdminApiKey:   getEnv("ADMIN_API_KEY", ""),
 		SMTPHost:      getEnv("SMTP_HOST", ""),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),
@@ -82,7 +82,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid database or SMTP port")
 		}
 	}
-	if _, _, err := net.SplitHostPort(c.HTTPAddr); err != nil {
+	if _, _, err := net.SplitHostPort(c.Port); err != nil {
 		return fmt.Errorf("invalid HTTP_ADDR: %w", err)
 	}
 	if strings.ContainsAny(c.SMTPFrom, "\r\n") {
