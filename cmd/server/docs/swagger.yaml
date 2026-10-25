@@ -23,6 +23,11 @@ definitions:
         type: string
       project_id:
         type: string
+      subscribed:
+        description: |-
+          Subscribed is false once the recipient has used their unsubscribe link.
+          Sends to the whole audience skip these rows.
+        type: boolean
     type: object
   domain.Email:
     properties:
@@ -175,6 +180,15 @@ definitions:
     - template
     - to
     type: object
+  dto.Subscription:
+    properties:
+      email:
+        type: string
+      project_id:
+        type: string
+      subscribed:
+        type: boolean
+    type: object
   dto.SwaggerAPIKeyData:
     properties:
       created_at:
@@ -254,6 +268,13 @@ definitions:
         items:
           $ref: '#/definitions/domain.Project'
         type: array
+      message:
+        type: string
+    type: object
+  dto.SwaggerSubscriptionResponse:
+    properties:
+      data:
+        $ref: '#/definitions/dto.Subscription'
       message:
         type: string
     type: object
@@ -1113,6 +1134,80 @@ paths:
       summary: Update a template
       tags:
       - Templates
+  /api/resubscribe:
+    post:
+      description: Turns the same subscription back on using the token from its unsubscribe
+        link. The existing audience entry is reused, never duplicated.
+      parameters:
+      - description: Unsubscribe token from the email link
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerSubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Resubscribe a recipient
+      tags:
+      - Unsubscribe
+  /api/unsubscribe:
+    get:
+      description: Public endpoint behind the unsubscribe link in every email. The
+        token identifies one subscription; the matching audience entry is kept but
+        marked unsubscribed, so sends to the whole audience skip it. Repeating the
+        call is harmless.
+      parameters:
+      - description: Unsubscribe token from the email link
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SwaggerSubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Unsubscribe a recipient
+      tags:
+      - Unsubscribe
 securityDefinitions:
   AdminKey:
     in: header
