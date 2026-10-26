@@ -47,8 +47,14 @@ const unsubscribeLinkPath = "/unsubscribe"
 
 // URL is the unsubscribe link to embed in a recipient's email. It points at
 // PublicBaseURL, so that must be the origin serving the confirmation page.
+//
+// The token rides in the path rather than the query string because an ESP's
+// click tracking rewrites the link and can drop the query string with it. Brevo
+// does exactly that, which leaves the reader on the page with nothing to
+// identify their subscription. A path segment stands a better chance of
+// surviving the round trip.
 func (t *UnsubscribeTokens) URL(projectID, email string) string {
-	return t.baseURL + unsubscribeLinkPath + "?token=" + url.QueryEscape(t.Token(projectID, email))
+	return t.baseURL + unsubscribeLinkPath + "/" + url.PathEscape(t.Token(projectID, email))
 }
 
 // UnsubscribeService resolves a token from an unsubscribe link back to the
