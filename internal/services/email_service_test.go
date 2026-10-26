@@ -25,6 +25,7 @@ func TestSendEmail_ValidRequest_PersistsBeforePublishing(t *testing.T) {
 	templateRepo.On("FindByNameAndProjectID", mock.Anything, "welcome", "project").Return(&domain.Template{Id: "template", Name: "welcome", ProjectID: "project", Subject: "Hello {{ .name }}", Content: "<p>{{ .name }}</p>"}, nil)
 
 	audienceRepo.On("FindByEmailAndProjectID", mock.Anything, "alice@example.com", "project").Return(nil, domain.ErrNotFound)
+	audienceRepo.On("SaveAll", mock.Anything, mock.Anything).Return(nil)
 
 	saved := false
 	emailRepo.On("Save", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -59,6 +60,7 @@ func TestSendEmail_PersistenceOrQueueFailure_ReturnsError(t *testing.T) {
 			templateRepo.On("FindByNameAndProjectID", mock.Anything, "welcome", "project").Return(&domain.Template{Id: "template", Name: "welcome", ProjectID: "project", Subject: "Hello", Content: "Hello"}, nil)
 
 			audienceRepo.On("FindByEmailAndProjectID", mock.Anything, "alice@example.com", "project").Return(nil, domain.ErrNotFound)
+			audienceRepo.On("SaveAll", mock.Anything, mock.Anything).Return(nil)
 
 			var saveErr error
 			if databaseFails {
@@ -99,7 +101,9 @@ func TestSendEmail_ResolvesTemplateNameWithinTheRequestingProject(t *testing.T) 
 		Return(nil, domain.ErrNotFound)
 
 	audienceRepo.On("FindByEmailAndProjectID", mock.Anything, "alice@example.com", "project-a").Return(nil, domain.ErrNotFound)
+	audienceRepo.On("SaveAll", mock.Anything, mock.Anything).Return(nil)
 	audienceRepo.On("FindByEmailAndProjectID", mock.Anything, "alice@example.com", "project-b").Return(nil, domain.ErrNotFound)
+	audienceRepo.On("SaveAll", mock.Anything, mock.Anything).Return(nil)
 	emailRepo.On("Save", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(1).(*domain.Email).ID = "email"
 	}).Return(nil).Once()
@@ -183,8 +187,9 @@ func TestSendEmail_ToAll_BackfillsAMissingTokenHash(t *testing.T) {
 	audienceRepo.AssertExpectations(t)
 }
 
-// A single-address send must honour the same opt-out, not slip past it.
-func TestSendEmail_SingleUnsubscribedRecipient_IsRefused(t *testing.T) {
+// A single-address send must honour the same opt-out, not slip past it — and
+// skipping is a success, so the caller gets no error to retry on.
+func TestSendEmail_SingleUnsubscribedRecipient_IsSkippedWithoutError(t *testing.T) {
 	templateRepo := new(mocks.TemplateRepository)
 	emailRepo := new(mocks.EmailRepository)
 	audienceRepo := new(mocks.AudienceRepository)
@@ -199,15 +204,18 @@ func TestSendEmail_SingleUnsubscribedRecipient_IsRefused(t *testing.T) {
 	service := NewEmailService(emailRepo, audienceRepo, templateRepo, publisher, tokens)
 	emails, err := service.SendEmail(context.Background(), "project", &dto.SendEmailRequest{To: "alice@example.com", Template: "welcome"})
 
-	assert.Nil(t, emails)
-	assert.ErrorIs(t, err, domain.ErrUnsubscribed)
+	require.NoError(t, err)
+	assert.Empty(t, emails)
 	emailRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
 	publisher.AssertNotCalled(t, "Publish", mock.Anything, mock.Anything)
+	// Nothing was queued, so the opt-out must not have been quietly undone.
+	audienceRepo.AssertNotCalled(t, "SetSubscribed", mock.Anything, mock.Anything, mock.Anything)
+	audienceRepo.AssertNotCalled(t, "SaveAll", mock.Anything, mock.Anything)
 }
 
 // An address outside the audience has no subscription to link to, so the
 // template still renders with an empty UnsubscribeURL rather than failing.
-func TestSendEmail_AddressOutsideTheAudience_RendersAnEmptyUnsubscribeURL(t *testing.T) {
+func TestSendEmail_AddressOutsideTheAudience_IsEnrolledAndGetsATokenisedLink(t *testing.T) {
 	templateRepo := new(mocks.TemplateRepository)
 	emailRepo := new(mocks.EmailRepository)
 	audienceRepo := new(mocks.AudienceRepository)
@@ -217,6 +225,12 @@ func TestSendEmail_AddressOutsideTheAudience_RendersAnEmptyUnsubscribeURL(t *tes
 	templateRepo.On("FindByNameAndProjectID", mock.Anything, "receipt", "project").
 		Return(&domain.Template{Id: "template", Name: "receipt", ProjectID: "project", Subject: "Receipt", Content: `Paid. {{ .UnsubscribeURL }}`}, nil)
 	audienceRepo.On("FindByEmailAndProjectID", mock.Anything, "carol@example.com", "project").Return(nil, domain.ErrNotFound).Once()
+	audienceRepo.On("SaveAll", mock.Anything, []domain.Audience{{
+		Email:            "carol@example.com",
+		ProjectID:        "project",
+		Subscribed:       true,
+		UnsubscribeToken: tokens.HashFor("project", "carol@example.com"),
+	}}).Return(nil).Once()
 	emailRepo.On("Save", mock.Anything, mock.Anything).Return(nil).Once()
 	publisher.On("Publish", mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -224,5 +238,6 @@ func TestSendEmail_AddressOutsideTheAudience_RendersAnEmptyUnsubscribeURL(t *tes
 	emails, err := service.SendEmail(context.Background(), "project", &dto.SendEmailRequest{To: "carol@example.com", Template: "receipt"})
 
 	require.NoError(t, err)
-	assert.Equal(t, "Paid. ", emails[0].Body)
+	assert.Equal(t, "Paid. "+tokens.URL("project", "carol@example.com"), emails[0].Body)
+	audienceRepo.AssertExpectations(t)
 }

@@ -36,7 +36,7 @@ func NewHandler(projectService *services.ProjectService, templateService *servic
 
 // sendEmail godoc
 // @Summary Queue an email
-// @Description Renders a project template with the supplied data and queues the email for SMTP delivery.
+// @Description Renders a project template with the supplied data and queues the email for SMTP delivery. A recipient who has unsubscribed is skipped rather than rejected: the response is still 202, with an empty data list.
 // @Tags Email
 // @Security ProjectApiKey
 // @Accept json

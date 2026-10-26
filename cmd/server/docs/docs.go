@@ -22,7 +22,7 @@ const docTemplate = `{
                         "ProjectApiKey": []
                     }
                 ],
-                "description": "Renders a project template with the supplied data and queues the email for SMTP delivery.",
+                "description": "Renders a project template with the supplied data and queues the email for SMTP delivery. A recipient who has unsubscribed is skipped rather than rejected: the response is still 202, with an empty data list.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1454,7 +1454,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "subscribed": {
-                    "description": "Subscribed is false once the recipient has used their unsubscribe link.\nSends to the whole audience skip these rows.",
                     "type": "boolean"
                 }
             }

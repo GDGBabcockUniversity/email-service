@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/mail"
 	"strings"
 	"time"
@@ -91,21 +92,26 @@ func (s *EmailService) SendEmail(ctx context.Context, projectID string, request 
 	}
 
 	// A one-off send still has to honour an unsubscribe: if this address is on
-	// the project's audience and has opted out, refuse rather than deliver.
+	// the project's audience and has opted out, skip it rather than deliver.
 	audience, err := s.audienceRepo.FindByEmailAndProjectID(ctx, request.To, projectID)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return nil, err
 	}
 	if audience != nil {
+		// Honouring the opt-out is the request succeeding, not failing: the
+		// caller is told nothing was queued and has nothing to retry. This
+		// matches the to: "all" path, which has always skipped these silently.
 		if !audience.Subscribed {
-			return nil, domain.ErrUnsubscribed
+			return []*domain.Email{}, nil
 		}
 		if err := s.ensureUnsubscribeToken(ctx, audience); err != nil {
 			return nil, err
 		}
+	} else if err := s.enrollRecipient(ctx, projectID, request.To); err != nil {
+		return nil, err
 	}
 
-	subject, body, err := renderTemplate(record, s.recipientData(request.Data, projectID, audienceEmail(audience)))
+	subject, body, err := renderTemplate(record, s.recipientData(request.Data, projectID, request.To))
 	if err != nil {
 		return nil, err
 	}
@@ -150,13 +156,13 @@ func (s *EmailService) queue(ctx context.Context, email *domain.Email) error {
 // templates render with missingkey=error.
 func (s *EmailService) recipientData(data map[string]string, projectID, email string) map[string]string {
 	merged := make(map[string]string, len(data)+1)
-	for key, value := range data {
-		merged[key] = value
-	}
+	maps.Copy(merged, data)
+
 	link := ""
 	if email != "" && s.tokens != nil {
 		link = s.tokens.URL(projectID, email)
 	}
+
 	merged["UnsubscribeURL"] = link
 	return merged
 }
@@ -178,11 +184,19 @@ func (s *EmailService) ensureUnsubscribeToken(ctx context.Context, audience *dom
 	return nil
 }
 
-func audienceEmail(audience *domain.Audience) string {
-	if audience == nil {
-		return ""
+// enrollRecipient records a one-off recipient on the project's audience so the
+// unsubscribe link in their email resolves to a subscription. Without a row the
+// token has nothing to point at, and the link would have to be sent without it.
+func (s *EmailService) enrollRecipient(ctx context.Context, projectID, email string) error {
+	if s.tokens == nil {
+		return nil
 	}
-	return audience.Email
+	return s.audienceRepo.SaveAll(ctx, []domain.Audience{{
+		Email:            email,
+		ProjectID:        projectID,
+		Subscribed:       true,
+		UnsubscribeToken: s.tokens.HashFor(projectID, email),
+	}})
 }
 
 // ListEmails returns a project's most recent emails for the admin dashboard,

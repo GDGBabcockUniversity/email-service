@@ -9,19 +9,37 @@ import (
 	"net"
 	"net/mail"
 	netsmtp "net/smtp"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/domain"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/infrastructure/config"
+	"github.com/GDGBabcockUnivsersity/email_service/internal/services"
 )
 
 type Sender struct {
 	config *config.Config
+	tokens *services.UnsubscribeTokens
 }
 
 func NewSender(cfg *config.Config) *Sender {
-	return &Sender{config: cfg}
+	return &Sender{
+		config: cfg,
+		tokens: services.NewUnsubscribeTokens(cfg.UnsubscribeSecret, cfg.PublicBaseURL),
+	}
+}
+
+func (s *Sender) listUnsubscribeHeaders(email *domain.Email) string {
+	if s.tokens == nil || email.ProjectID == "" || email.To == "" {
+		return ""
+	}
+	link := strings.TrimRight(s.config.PublicBaseURL, "/") +
+		"/api/unsubscribe?token=" + url.QueryEscape(s.tokens.Token(email.ProjectID, email.To))
+	if strings.ContainsAny(link, "\r\n") || !strings.HasPrefix(link, "http") {
+		return ""
+	}
+	return fmt.Sprintf("List-Unsubscribe: <%s>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n", link)
 }
 
 func (s *Sender) Send(ctx context.Context, email *domain.Email) error {
@@ -86,8 +104,8 @@ func (s *Sender) Send(ctx context.Context, email *domain.Email) error {
 	if err != nil {
 		return err
 	}
-	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMessage-ID: <%s@gdg-email.local>\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n",
-		fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("utf-8", s.config.SMTPName), s.config.SMTPFrom), email.To, mime.QEncoding.Encode("utf-8", email.Subject), time.Now().UTC().Format(time.RFC1123Z), email.ID)
+	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\n%sMessage-ID: <%s@gdg-email.local>\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n",
+		fmt.Sprintf("%s <%s>", mime.QEncoding.Encode("utf-8", s.config.SMTPName), s.config.SMTPFrom), email.To, mime.QEncoding.Encode("utf-8", email.Subject), time.Now().UTC().Format(time.RFC1123Z), s.listUnsubscribeHeaders(email), email.ID)
 	if _, err := writer.Write([]byte(headers)); err != nil {
 		return err
 	}
