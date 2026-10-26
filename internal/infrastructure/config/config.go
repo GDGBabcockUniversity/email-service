@@ -32,7 +32,10 @@ type Config struct {
 	// it invalidates every unsubscribe link already sent out.
 	UnsubscribeSecret string
 	// PublicBaseURL is the externally reachable origin used to build the
-	// unsubscribe links embedded in emails.
+	// unsubscribe links embedded in emails. It must be the origin serving the
+	// /unsubscribe confirmation page, which is the public website rather than
+	// this service, and it has to be reachable from a recipient's inbox: a
+	// localhost value parses fine but ships dead links.
 	PublicBaseURL string
 }
 

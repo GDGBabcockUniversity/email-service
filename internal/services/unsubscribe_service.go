@@ -39,9 +39,16 @@ func (t *UnsubscribeTokens) HashFor(projectID, email string) string {
 	return t.Hash(t.Token(projectID, email))
 }
 
-// URL is the unsubscribe link to embed in a recipient's email.
+// unsubscribeLinkPath is the reader-facing confirmation page, not this
+// service's own endpoint: a recipient clicking from their inbox should land on
+// a page that asks before opting them out. That page posts the token back to
+// POST /api/unsubscribe, which stays available for direct use.
+const unsubscribeLinkPath = "/unsubscribe"
+
+// URL is the unsubscribe link to embed in a recipient's email. It points at
+// PublicBaseURL, so that must be the origin serving the confirmation page.
 func (t *UnsubscribeTokens) URL(projectID, email string) string {
-	return t.baseURL + "/api/unsubscribe?token=" + url.QueryEscape(t.Token(projectID, email))
+	return t.baseURL + unsubscribeLinkPath + "?token=" + url.QueryEscape(t.Token(projectID, email))
 }
 
 // UnsubscribeService resolves a token from an unsubscribe link back to the
