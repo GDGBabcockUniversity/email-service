@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"regexp"
 	"strings"
 	texttemplate "text/template"
 
@@ -26,6 +27,7 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, projectID string, 
 	if err != nil {
 		return nil, err
 	}
+	request.Content = withUnsubscribeFooter(request.Content)
 	if err := validateTemplate(request); err != nil {
 		return nil, err
 	}
@@ -79,6 +81,7 @@ func (s *TemplateService) UpdateTemplate(ctx context.Context, projectID, id stri
 	if err != nil {
 		return nil, err
 	}
+	request.Content = withUnsubscribeFooter(request.Content)
 	if err := validateTemplate(request); err != nil {
 		return nil, err
 	}
@@ -97,6 +100,24 @@ func (s *TemplateService) DeleteTemplate(ctx context.Context, projectID, id stri
 		return err
 	}
 	return s.templateRepo.Delete(ctx, id)
+}
+
+// unsubscribeFooter is appended to every stored template body, so no send can
+// go out without a way for the reader to opt back out.
+const unsubscribeFooter = `<p><a href="{{ .UnsubscribeURL }}">Unsubscribe</a></p>`
+
+// unsubscribePlaceholder matches the action that renders a recipient's link,
+// however the author spaced it.
+var unsubscribePlaceholder = regexp.MustCompile(`\{\{-?\s*\.UnsubscribeURL\s*-?\}\}`)
+
+// withUnsubscribeFooter appends the footer unless the body already places the
+// link somewhere of its own, so an author can move it but not drop it. An empty
+// body is left alone for validateTemplate to reject.
+func withUnsubscribeFooter(content string) string {
+	if strings.TrimSpace(content) == "" || unsubscribePlaceholder.MatchString(content) {
+		return content
+	}
+	return strings.TrimRight(content, " \t\r\n") + "\n" + unsubscribeFooter
 }
 
 func validateTemplate(request dto.CreateTemplateRequest) error {

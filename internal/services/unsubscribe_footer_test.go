@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The footer the dashboard appends has to survive template validation and then
+// The footer the service appends has to survive template validation and then
 // render into a real link for a recipient.
-func TestDashboardUnsubscribeFooter_ValidatesAndRenders(t *testing.T) {
-	content := "<h1>Hello {{.name}}</h1>\n<p><a href=\"{{ .UnsubscribeURL }}\">Unsubscribe</a></p>"
+func TestUnsubscribeFooter_ValidatesAndRenders(t *testing.T) {
+	content := withUnsubscribeFooter("<h1>Hello {{.name}}</h1>")
 
 	require.NoError(t, validateTemplate(dto.CreateTemplateRequest{Name: "news", Subject: "News", Content: content}))
 
