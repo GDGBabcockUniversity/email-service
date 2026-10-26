@@ -31,7 +31,7 @@ func TestUnsubscribeTokens_StoresOnlyTheHashAndBuildsALink(t *testing.T) {
 	assert.NotEqual(t, token, NewUnsubscribeTokens("other-secret", "https://mail.example.com").Token("project", "alice@example.com"))
 	// The link goes to the reader-facing confirmation page, not this service's
 	// own endpoint, so a click never opts someone out without asking.
-	assert.Equal(t, "https://mail.example.com/unsubscribe?token="+token, tokens.URL("project", "alice@example.com"))
+	assert.Equal(t, "https://mail.example.com/unsubscribe/"+token, tokens.URL("project", "alice@example.com"))
 }
 
 func TestUnsubscribe_HashesTheTokenAndFlipsTheSubscription(t *testing.T) {

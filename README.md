@@ -17,7 +17,7 @@ docker compose logs -f app
 
 SMTP uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM`. Set `SMTP_TLS_MODE=starttls` for STARTTLS (default port 587), or `tls` for implicit TLS (set port 465). Supply your Gmail app password or Brevo SMTP credentials and an authorized sender address. `none` is supported only with empty SMTP username/password for local test servers.
 
-`UNSUBSCRIBE_SECRET` (`openssl rand -hex 32`) signs the unsubscribe tokens, and `PUBLIC_BASE_URL` is the origin used to build the unsubscribe links inside emails. Emails link to `<PUBLIC_BASE_URL>/unsubscribe?token=...`, a confirmation page served by the public website rather than by this service, so set it to that site's origin in production — a `localhost` value passes validation but ships links no recipient can open. Rotating the secret invalidates every unsubscribe link already in recipients' inboxes.
+`UNSUBSCRIBE_SECRET` (`openssl rand -hex 32`) signs the unsubscribe tokens, and `PUBLIC_BASE_URL` is the origin used to build the unsubscribe links inside emails. Emails link to `<PUBLIC_BASE_URL>/unsubscribe/<token>`, a confirmation page served by the public website rather than by this service, so set it to that site's origin in production — a `localhost` value passes validation but ships links no recipient can open. Rotating the secret invalidates every unsubscribe link already in recipients' inboxes.
 
 Compose supplies the database hostname and local Redis URL. To use Upstash, set `REDIS_URL` to its Redis protocol `rediss://...` URL, not its REST URL. PostgreSQL and Redis data use named volumes.
 
@@ -147,7 +147,7 @@ curl -X POST "http://localhost:8080/api/projects/$PROJECT_ID/templates" \
 
 Every template gets `<p><a href="{{ .UnsubscribeURL }}">Unsubscribe</a></p>` appended to its body on create and update, unless the body already references `{{ .UnsubscribeURL }}` somewhere — move it to place the link yourself. This happens in the service, so it applies to the dashboard and the API alike; there is no way to store a template without the link.
 
-Clicking the link opens `<PUBLIC_BASE_URL>/unsubscribe?token=...`, a page on the public website that asks the reader to confirm before anything changes, so a link prefetched by a mail client never opts someone out on its own. That page posts the token back to `POST /api/unsubscribe?token=...` here, which hashes the token, finds the subscription it belongs to, and sets `subscribed` to false:
+Clicking the link opens `<PUBLIC_BASE_URL>/unsubscribe/<token>`, a page on the public website that asks the reader to confirm before anything changes, so a link prefetched by a mail client never opts someone out on its own. The token rides in the path because an ESP's click tracking can drop the query string when it rewrites the link — Brevo does — which would strand the reader on the page with nothing identifying their subscription. The site still accepts `/unsubscribe?token=...` for links already sitting in inboxes. That page posts the token back to `POST /api/unsubscribe?token=...` here, which hashes the token, finds the subscription it belongs to, and sets `subscribed` to false:
 
 ```json
 {"message":"Unsubscribed","data":{"email":"recipient@example.com","project_id":"<project UUID>","subscribed":false}}
