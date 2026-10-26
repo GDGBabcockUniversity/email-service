@@ -95,8 +95,6 @@ func respondError(c *gin.Context, err error) {
 		status, message = http.StatusUnauthorized, domain.ErrUnauthorized.Error()
 	case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrProjectNotFound):
 		status, message = http.StatusNotFound, "Resource Not Found"
-	case errors.Is(err, domain.ErrUnsubscribed):
-		status, message = http.StatusConflict, domain.ErrUnsubscribed.Error()
 	case errors.Is(err, domain.ErrConflict), errors.Is(err, domain.ErrDuplicateProjectName):
 		status, message = http.StatusConflict, "Resource Already Exists"
 	case errors.Is(err, domain.ErrUnavailable), errors.Is(err, context.DeadlineExceeded):
