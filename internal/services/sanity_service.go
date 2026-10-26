@@ -87,7 +87,7 @@ func (s *SanityService) Webhook(ctx context.Context, projectID string, data dto.
 	_, err := s.EmailService.SendEmail(ctx, projectID, &dto.SendEmailRequest{
 		To:       "all",
 		Template: "newsletter",
-		Data:     map[string]string{"Title": data.Title},
+		Data:     map[string]string{"Title": data.Title, "Cover": data.CoverImage, "IssueNumber": data.IssueNumber, "Slug": data.Slug},
 	})
 
 	if err != nil {
