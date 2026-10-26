@@ -57,7 +57,7 @@ func (s *SanityService) VerifySignature(body []byte, signatureHeader, secret str
 
 	now := time.Now().UnixMilli()
 
-	if ts < now-300 || ts > now+300 {
+	if ts < now-5000 || ts > now+5000 {
 		return errors.New("Expired webhook")
 	}
 
