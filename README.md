@@ -17,7 +17,7 @@ docker compose logs -f app
 
 SMTP uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM`. Set `SMTP_TLS_MODE=starttls` for STARTTLS (default port 587), or `tls` for implicit TLS (set port 465). Supply your Gmail app password or Brevo SMTP credentials and an authorized sender address. `none` is supported only with empty SMTP username/password for local test servers.
 
-`UNSUBSCRIBE_SECRET` (`openssl rand -hex 32`) signs the unsubscribe tokens, and `PUBLIC_BASE_URL` is the origin used to build the unsubscribe links inside emails; set it to the service's public URL in production. Rotating the secret invalidates every unsubscribe link already in recipients' inboxes.
+`UNSUBSCRIBE_SECRET` (`openssl rand -hex 32`) signs the unsubscribe tokens, and `PUBLIC_BASE_URL` is the origin used to build the unsubscribe links inside emails. Emails link to `<PUBLIC_BASE_URL>/unsubscribe?token=...`, a confirmation page served by the public website rather than by this service, so set it to that site's origin in production — a `localhost` value passes validation but ships links no recipient can open. Rotating the secret invalidates every unsubscribe link already in recipients' inboxes.
 
 Compose supplies the database hostname and local Redis URL. To use Upstash, set `REDIS_URL` to its Redis protocol `rediss://...` URL, not its REST URL. PostgreSQL and Redis data use named volumes.
 
@@ -145,15 +145,15 @@ curl -X POST "http://localhost:8080/api/projects/$PROJECT_ID/templates" \
   -d '{"name":"news","subject":"GDG news","content":"<p>Hello.</p><p><a href=\"{{ .UnsubscribeURL }}\">Unsubscribe</a></p>"}'
 ```
 
-Templates created or edited on the dashboard get `<p><a href="{{ .UnsubscribeURL }}">Unsubscribe</a></p>` appended to the body on save, unless the body already references `{{ .UnsubscribeURL }}` somewhere — move it to place the link yourself. Templates created straight through the API are left exactly as submitted.
+Every template gets `<p><a href="{{ .UnsubscribeURL }}">Unsubscribe</a></p>` appended to its body on create and update, unless the body already references `{{ .UnsubscribeURL }}` somewhere — move it to place the link yourself. This happens in the service, so it applies to the dashboard and the API alike; there is no way to store a template without the link.
 
-Clicking the link hits `GET /api/unsubscribe?token=...`, which hashes the token, finds the subscription it belongs to, and sets `subscribed` to false:
+Clicking the link opens `<PUBLIC_BASE_URL>/unsubscribe?token=...`, a page on the public website that asks the reader to confirm before anything changes, so a link prefetched by a mail client never opts someone out on its own. That page posts the token back to `POST /api/unsubscribe?token=...` here, which hashes the token, finds the subscription it belongs to, and sets `subscribed` to false:
 
 ```json
 {"message":"Unsubscribed","data":{"email":"recipient@example.com","project_id":"<project UUID>","subscribed":false}}
 ```
 
-The audience entry stays in place. `to: "all"` sends only to subscribed addresses, and a single-recipient send to an address that unsubscribed is refused with 409. Sending to an address outside the audience renders `{{ .UnsubscribeURL }}` as an empty string.
+The audience entry stays in place. `to: "all"` sends only to subscribed addresses, and a single-recipient send to an address that unsubscribed is skipped the same way: the call still returns 202 with an empty `data` list, since honouring the opt-out is the request succeeding and there is nothing for the caller to retry. A single-recipient send to an address that is not on the audience yet adds it (subscribed, with its token hash) before rendering, so the recipient gets a working unsubscribe link rather than an empty one.
 
 `POST /api/resubscribe?token=...` turns the same entry back on, and re-adding the address through `POST /api/projects/:projectId/audience` does the same: an address already on the list keeps its row and only has `subscribed` set back to true, so a project never collects a second entry for one address. Repeating either call is harmless; an unknown token returns 404. Both endpoints are public by design, since recipients click them from their inbox with no credentials.
 
