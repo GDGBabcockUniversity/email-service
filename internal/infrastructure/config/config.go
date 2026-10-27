@@ -10,24 +10,26 @@ import (
 )
 
 type Config struct {
-	DBHost        string
-	DBPort        string
-	DBUser        string
-	DBPassword    string
-	DBName        string
-	DBSSLMode     string
-	REDIS_URL     string
-	Port          string
-	AdminApiKey   string
-	SMTPHost      string
-	SMTPPort      string
-	SMTPUsername  string
-	SMTPPassword  string
-	SMTPFrom      string
-	SMTPName      string
-	SMTPTLSMode   string
-	SanityUrl     string
-	WebhookSecret string
+	DBHost          string
+	DBPort          string
+	DBUser          string
+	DBPassword      string
+	DBName          string
+	DBSSLMode       string
+	REDIS_URL       string
+	Port            string
+	AdminApiKey     string
+	SMTPHost        string
+	SMTPPort        string
+	SMTPUsername    string
+	SMTPPassword    string
+	SMTPFrom        string
+	SMTPName        string
+	SMTPTLSMode     string
+	SanityUrl       string
+	SanityProjectID string
+	SanityDataset   string
+	WebhookSecret   string
 	// UnsubscribeSecret signs the per-subscription unsubscribe tokens. Changing
 	// it invalidates every unsubscribe link already sent out.
 	UnsubscribeSecret string
@@ -54,24 +56,26 @@ func listenAddr(value string) string {
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		DBHost:        getEnv("DB_HOST", "localhost"),
-		DBPort:        getEnv("DB_PORT", "5432"),
-		DBUser:        getEnv("DB_USER", "postgres"),
-		DBPassword:    getEnv("DB_PASSWORD", ""),
-		DBName:        getEnv("DB_NAME", "email_service"),
-		DBSSLMode:     getEnv("DB_SSLMODE", "disable"),
-		REDIS_URL:     getEnv("REDIS_URL", "redis://localhost:6379/0"),
-		Port:          getEnv("PORT", ":8080"),
-		AdminApiKey:   getEnv("ADMIN_API_KEY", ""),
-		SMTPHost:      getEnv("SMTP_HOST", ""),
-		SMTPPort:      getEnv("SMTP_PORT", "587"),
-		SMTPUsername:  getEnv("SMTP_USERNAME", ""),
-		SMTPPassword:  getEnv("SMTP_PASSWORD", ""),
-		SMTPFrom:      getEnv("SMTP_FROM", ""),
-		SMTPName:      getEnv("SMTP_NAME", ""),
-		SMTPTLSMode:   getEnv("SMTP_TLS_MODE", "starttls"),
-		SanityUrl:     getEnv("SANITY_URL", ""),
-		WebhookSecret: getEnv("WEBHOOK_SECRET", ""),
+		DBHost:          getEnv("DB_HOST", "localhost"),
+		DBPort:          getEnv("DB_PORT", "5432"),
+		DBUser:          getEnv("DB_USER", "postgres"),
+		DBPassword:      getEnv("DB_PASSWORD", ""),
+		DBName:          getEnv("DB_NAME", "email_service"),
+		DBSSLMode:       getEnv("DB_SSLMODE", "disable"),
+		REDIS_URL:       getEnv("REDIS_URL", "redis://localhost:6379/0"),
+		Port:            getEnv("PORT", ":8080"),
+		AdminApiKey:     getEnv("ADMIN_API_KEY", ""),
+		SMTPHost:        getEnv("SMTP_HOST", ""),
+		SMTPPort:        getEnv("SMTP_PORT", "587"),
+		SMTPUsername:    getEnv("SMTP_USERNAME", ""),
+		SMTPPassword:    getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:        getEnv("SMTP_FROM", ""),
+		SMTPName:        getEnv("SMTP_NAME", ""),
+		SMTPTLSMode:     getEnv("SMTP_TLS_MODE", "starttls"),
+		SanityUrl:       getEnv("SANITY_URL", ""),
+		SanityProjectID: getEnv("SANITY_PROJECT_ID", ""),
+		SanityDataset:   getEnv("SANITY_DATASET", "production"),
+		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
 
 		UnsubscribeSecret: getEnv("UNSUBSCRIBE_SECRET", ""),
 		PublicBaseURL:     getEnv("PUBLIC_BASE_URL", "http://localhost:8080"),

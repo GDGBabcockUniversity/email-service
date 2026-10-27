@@ -83,7 +83,7 @@ func flattenSanityValue(value any) string {
 	case float64:
 		return strconv.FormatFloat(typed, 'f', -1, 64)
 	case map[string]any:
-		for _, key := range []string{"current", "url", "asset"} {
+		for _, key := range []string{"current", "url", "asset", "_ref"} {
 			if nested, found := typed[key]; found {
 				if text := flattenSanityValue(nested); text != "" {
 					return text

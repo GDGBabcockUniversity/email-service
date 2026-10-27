@@ -15,17 +15,39 @@ import (
 )
 
 type SanityService struct {
-	BaseUrl      string
+	ProjectID    string
+	Dataset      string
 	Secret       string
 	EmailService *EmailService
 }
 
-func NewSanityService(baseUrl, secret string, emailService *EmailService) *SanityService {
+func NewSanityService(projectID, dataset, secret string, emailService *EmailService) *SanityService {
 	return &SanityService{
-		BaseUrl:      baseUrl,
+		ProjectID:    projectID,
+		Dataset:      dataset,
 		Secret:       secret,
 		EmailService: emailService,
 	}
+}
+
+func sanityImageURL(projectID, dataset, value string) string {
+	if !strings.HasPrefix(value, "image-") {
+		return value
+	}
+	if projectID == "" || dataset == "" {
+		return ""
+	}
+	parts := strings.Split(value, "-")
+	if len(parts) < 4 {
+		return ""
+	}
+	asset := strings.Join(parts[1:len(parts)-2], "-")
+	dimensions := parts[len(parts)-2]
+	extension := parts[len(parts)-1]
+	if asset == "" || dimensions == "" || extension == "" {
+		return ""
+	}
+	return fmt.Sprintf("https://cdn.sanity.io/images/%s/%s/%s-%s.%s", projectID, dataset, asset, dimensions, extension)
 }
 
 func (s *SanityService) VerifySignature(body []byte, signatureHeader, secret string) error {
@@ -87,7 +109,7 @@ func (s *SanityService) Webhook(ctx context.Context, projectID string, data dto.
 	_, err := s.EmailService.SendEmail(ctx, projectID, &dto.SendEmailRequest{
 		To:       "all",
 		Template: "newsletter",
-		Data:     map[string]string{"Title": data.Title, "Cover": data.CoverImage, "IssueNumber": data.IssueNumber, "Slug": data.Slug},
+		Data:     map[string]string{"Title": data.Title, "Cover": sanityImageURL(s.ProjectID, s.Dataset, data.CoverImage), "IssueNumber": data.IssueNumber, "Slug": data.Slug},
 	})
 
 	if err != nil {
