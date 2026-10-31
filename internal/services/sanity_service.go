@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
+	sanity "github.com/sanity-io/client-go"
 )
 
 type SanityService struct {
@@ -19,10 +20,18 @@ type SanityService struct {
 	Dataset      string
 	Secret       string
 	EmailService *EmailService
+	// Client is nil when the project or dataset is unset; the webhook then
+	// trusts its payload instead of looking the document up.
+	Client *sanity.Client
 }
 
-func NewSanityService(projectID, dataset, secret string, emailService *EmailService) *SanityService {
+func NewSanityService(projectID, dataset, secret, token string, emailService *EmailService, opts ...sanity.Option) *SanityService {
+	client, err := sanity.New(projectID, append([]sanity.Option{sanity.WithDataset(dataset), sanity.WithToken(token)}, opts...)...)
+	if err != nil {
+		slog.Warn("sanity client disabled", "err", err)
+	}
 	return &SanityService{
+		Client:       client,
 		ProjectID:    projectID,
 		Dataset:      dataset,
 		Secret:       secret,
@@ -104,12 +113,50 @@ func (s *SanityService) VerifySignature(body []byte, signatureHeader, secret str
 	return nil
 }
 
+var sanityTemplates = map[string]string{"issue": "newsletter", "article": "article"}
+
+func (s *SanityService) fetchPublished(ctx context.Context, id string) (string, map[string]string, error) {
+	if strings.HasPrefix(id, "drafts.") {
+		return "", nil, nil
+	}
+
+	result, err := s.Client.Query(`*[_id == $id && _type in ["issue", "article"]][0]{_type, title, "issueNumber": string(issueNumber), "slug": slug.current, "cover": coverImage.asset->url}`).
+		Param("id", id).Do(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	var doc *struct{ Type, Title, IssueNumber, Slug, Cover string }
+	if err := result.Unmarshal(&doc); err != nil {
+		return "", nil, err
+	}
+	if doc == nil {
+		return "", nil, nil
+	}
+	return sanityTemplates[doc.Type], map[string]string{"Title": doc.Title, "Cover": doc.Cover, "IssueNumber": doc.IssueNumber, "Slug": doc.Slug}, nil
+}
+
 func (s *SanityService) Webhook(ctx context.Context, projectID string, data dto.SanityWebhookRequest) error {
+
+	template := sanityTemplates[data.Type]
+	if template == "" {
+		template = "newsletter"
+	}
+	fields := map[string]string{"Title": data.Title, "Cover": sanityImageURL(s.ProjectID, s.Dataset, data.CoverImage), "IssueNumber": data.IssueNumber, "Slug": data.Slug}
+	if data.ID != "" && s.Client != nil {
+		var err error
+		if template, fields, err = s.fetchPublished(ctx, data.ID); err != nil {
+			return err
+		}
+		if template == "" {
+			slog.Info("Skipped unpublished or unsupported document", "id", data.ID)
+			return nil
+		}
+	}
 
 	_, err := s.EmailService.SendEmail(ctx, projectID, &dto.SendEmailRequest{
 		To:       "all",
-		Template: "newsletter",
-		Data:     map[string]string{"Title": data.Title, "Cover": sanityImageURL(s.ProjectID, s.Dataset, data.CoverImage), "IssueNumber": data.IssueNumber, "Slug": data.Slug},
+		Template: template,
+		Data:     fields,
 	})
 
 	if err != nil {

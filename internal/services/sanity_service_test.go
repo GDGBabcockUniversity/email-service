@@ -1,7 +1,12 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
+	sanity "github.com/sanity-io/client-go"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
@@ -72,6 +77,39 @@ func TestSanityImageURL_FromAWebhookBody(t *testing.T) {
 			var request dto.SanityWebhookRequest
 			assert.NoError(t, json.Unmarshal([]byte(testCase.body), &request))
 			assert.Equal(t, testCase.want, sanityImageURL("abc123", "production", request.CoverImage))
+		})
+	}
+}
+
+func TestSanityService_FetchPublished(t *testing.T) {
+	for name, testCase := range map[string]struct {
+		id, response, template string
+		fields                 map[string]string
+	}{
+		"issue": {
+			id: "abc", response: `{"Type":"issue","Title":"Issue 4","IssueNumber":"4","Slug":"issue-4","Cover":"c.png"}`, template: "newsletter",
+			fields: map[string]string{"Title": "Issue 4", "Cover": "c.png", "IssueNumber": "4", "Slug": "issue-4"},
+		},
+		"article": {
+			id: "abc", response: `{"Type":"article","Title":"Hello","Slug":"hello"}`, template: "article",
+			fields: map[string]string{"Title": "Hello", "Cover": "", "IssueNumber": "", "Slug": "hello"},
+		},
+		"draft is skipped without a query": {id: "drafts.abc"},
+		"missing document is skipped":      {id: "abc", response: `null`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.NotEqual(t, "drafts.abc", testCase.id, "drafts must not hit Sanity")
+				w.Write([]byte(`{"ms":1,"result":` + testCase.response + `}`))
+			}))
+			defer srv.Close()
+			u, _ := url.Parse(srv.URL)
+			s := NewSanityService("proj", "production", "secret", "", nil, sanity.WithBaseURL(*u))
+
+			template, fields, err := s.fetchPublished(context.Background(), testCase.id)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.template, template)
+			assert.Equal(t, testCase.fields, fields)
 		})
 	}
 }
