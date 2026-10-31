@@ -441,7 +441,9 @@ func (h *Handler) sanityWebhook(c *gin.Context) {
 		return
 	}
 
-	_ = h.sanityService.Webhook(c.Request.Context(), projectID, sanityWebhookRequest)
+	if err := h.sanityService.Webhook(c.Request.Context(), projectID, sanityWebhookRequest); err != nil {
+		slog.Error("sanity webhook failed", "err", err)
+	}
 	c.JSON(http.StatusOK, map[string]string{"status": "done"})
 }
 

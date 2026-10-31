@@ -87,11 +87,11 @@ func TestSanityService_FetchPublished(t *testing.T) {
 		fields                 map[string]string
 	}{
 		"issue": {
-			id: "abc", response: `{"Type":"issue","Title":"Issue 4","IssueNumber":"4","Slug":"issue-4","Cover":"c.png"}`, template: "newsletter",
+			id: "abc", response: `{"_type":"issue","title":"Issue 4","issueNumber":"4","slug":"issue-4","cover":"c.png"}`, template: "newsletter",
 			fields: map[string]string{"Title": "Issue 4", "Cover": "c.png", "IssueNumber": "4", "Slug": "issue-4"},
 		},
 		"article": {
-			id: "abc", response: `{"Type":"article","Title":"Hello","Slug":"hello"}`, template: "article",
+			id: "abc", response: `{"_type":"article","title":"Hello","slug":"hello"}`, template: "article",
 			fields: map[string]string{"Title": "Hello", "Cover": "", "IssueNumber": "", "Slug": "hello"},
 		},
 		"draft is skipped without a query": {id: "drafts.abc"},

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,13 +21,13 @@ type SanityService struct {
 	Dataset      string
 	Secret       string
 	EmailService *EmailService
-	// Client is nil when the project or dataset is unset; the webhook then
-	// trusts its payload instead of looking the document up.
 	Client *sanity.Client
 }
 
 func NewSanityService(projectID, dataset, secret, token string, emailService *EmailService, opts ...sanity.Option) *SanityService {
-	client, err := sanity.New(projectID, append([]sanity.Option{sanity.WithDataset(dataset), sanity.WithToken(token)}, opts...)...)
+
+	apiVersion := sanity.WithBaseURL(url.URL{Scheme: "https", Path: "/v2025-02-19"})
+	client, err := sanity.New(projectID, append([]sanity.Option{apiVersion, sanity.WithDataset(dataset), sanity.WithToken(token)}, opts...)...)
 	if err != nil {
 		slog.Warn("sanity client disabled", "err", err)
 	}
@@ -125,7 +126,13 @@ func (s *SanityService) fetchPublished(ctx context.Context, id string) (string, 
 	if err != nil {
 		return "", nil, err
 	}
-	var doc *struct{ Type, Title, IssueNumber, Slug, Cover string }
+	var doc *struct {
+		Type        string `json:"_type"`
+		Title       string `json:"title"`
+		IssueNumber string `json:"issueNumber"`
+		Slug        string `json:"slug"`
+		Cover       string `json:"cover"`
+	}
 	if err := result.Unmarshal(&doc); err != nil {
 		return "", nil, err
 	}
