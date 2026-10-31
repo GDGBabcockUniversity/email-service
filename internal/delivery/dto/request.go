@@ -32,6 +32,8 @@ type Audience struct {
 }
 
 type SanityWebhookRequest struct {
+	ID          string `json:"_id"`
+	Type        string `json:"_type"`
 	Title       string `json:"title"`
 	IssueNumber string `json:"issueNumber"`
 	Slug        string `json:"slug"`
@@ -39,6 +41,8 @@ type SanityWebhookRequest struct {
 }
 
 var sanityFieldAliases = map[string][]string{
+	"_id":         {"_id"},
+	"_type":       {"_type"},
 	"title":       {"title"},
 	"issueNumber": {"issueNumber", "issue_number"},
 	"slug":        {"slug"},
@@ -50,6 +54,8 @@ func (r *SanityWebhookRequest) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
+	r.ID = sanityText(fields, "_id")
+	r.Type = sanityText(fields, "_type")
 	r.Title = sanityText(fields, "title")
 	r.IssueNumber = sanityText(fields, "issueNumber")
 	r.Slug = sanityText(fields, "slug")

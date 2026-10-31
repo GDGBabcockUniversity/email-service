@@ -29,6 +29,7 @@ type Config struct {
 	SanityUrl       string
 	SanityProjectID string
 	SanityDataset   string
+	SanityToken     string
 	WebhookSecret   string
 	// UnsubscribeSecret signs the per-subscription unsubscribe tokens. Changing
 	// it invalidates every unsubscribe link already sent out.
@@ -75,6 +76,7 @@ func Load() (*Config, error) {
 		SanityUrl:       getEnv("SANITY_URL", ""),
 		SanityProjectID: getEnv("SANITY_PROJECT_ID", ""),
 		SanityDataset:   getEnv("SANITY_DATASET", "production"),
+		SanityToken:     getEnv("SANITY_TOKEN", ""),
 		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
 
 		UnsubscribeSecret: getEnv("UNSUBSCRIBE_SECRET", ""),

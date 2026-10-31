@@ -51,7 +51,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	emailService := services.NewEmailService(emailRepo, audienceRepo, templateRepo, queue, unsubscribeTokens)
 	unsubscribeService := services.NewUnsubscribeService(audienceRepo, unsubscribeTokens)
 	consumer := services.NewEmailConsumer(emailRepo, smtp.NewSender(cfg))
-	webhookService := services.NewSanityService(cfg.SanityProjectID, cfg.SanityDataset, cfg.WebhookSecret, emailService)
+	webhookService := services.NewSanityService(cfg.SanityProjectID, cfg.SanityDataset, cfg.WebhookSecret, cfg.SanityToken, emailService)
 	router := delivery.NewRouter(cfg.AdminApiKey, projectService, templateService, keyService, emailService, webhookService, unsubscribeService)
 
 	server := &http.Server{

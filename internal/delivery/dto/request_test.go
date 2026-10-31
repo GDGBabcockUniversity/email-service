@@ -22,7 +22,7 @@ func TestSanityWebhookRequest_DecodesEveryProjectionShape(t *testing.T) {
 		},
 		"raw document, nothing flattened": {
 			body: `{"_id":"abc","_type":"issue","title":"Issue 4","issueNumber":4,"slug":{"_type":"slug","current":"issue-4"},"coverImage":{"_type":"image","asset":{"url":"https://cdn.sanity.io/images/x.png"}}}`,
-			want: SanityWebhookRequest{Title: "Issue 4", IssueNumber: "4", Slug: "issue-4", CoverImage: "https://cdn.sanity.io/images/x.png"},
+			want: SanityWebhookRequest{ID: "abc", Type: "issue", Title: "Issue 4", IssueNumber: "4", Slug: "issue-4", CoverImage: "https://cdn.sanity.io/images/x.png"},
 		},
 		"asset left as a reference yields the ref": {
 			body: `{"title":"Issue 4","coverImage":{"asset":{"_ref":"image-xyz-1200x630-png"}}}`,

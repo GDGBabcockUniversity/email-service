@@ -45,7 +45,7 @@ func TestSendEmail_InvalidJSON_ReturnsBadRequest(t *testing.T) {
 
 	apiKeyRepo.On("FindByKey", mock.Anything, mock.Anything).Return(&domain.ApiKey{ProjectID: "project"}, nil)
 	projectRepo.On("FindByID", mock.Anything, "project").Return(&domain.Project{}, nil)
-	router := NewRouter("admin", nil, nil, services.NewApiKeyService(apiKeyRepo, projectRepo), nil, services.NewSanityService("proj", "production", "secret", services.NewEmailService(emailRepo, nil, nil, nil, services.NewUnsubscribeTokens("unsub-secret", "http://localhost:8080"))), nil)
+	router := NewRouter("admin", nil, nil, services.NewApiKeyService(apiKeyRepo, projectRepo), nil, services.NewSanityService("proj", "production", "secret", "", services.NewEmailService(emailRepo, nil, nil, nil, services.NewUnsubscribeTokens("unsub-secret", "http://localhost:8080"))), nil)
 
 	for _, body := range []string{"{", `{"to":"not-an-email","template":"bad"}`, `{}`} {
 		request := httptest.NewRequest(http.MethodPost, "/api/email", strings.NewReader(body))
