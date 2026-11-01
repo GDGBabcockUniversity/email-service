@@ -54,9 +54,49 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* The console is dark only, like the chapter site. The four Google colours are
-   reserved for delivery status, so a colour always answers the same question. */
+/* Light is the base theme; .dark is the chapter-site look. The four Google colours
+   are reserved for delivery status, so a colour always answers the same question. */
 :root {
+    color-scheme: light;
+    --google-blue: #4285f4;
+    --google-red: #ea4335;
+    --google-yellow: #fbbc04;
+    --google-green: #34a853;
+    --background: #f6f6f7;
+    --foreground: #141416;
+    --card: #ffffff;
+    --card-foreground: #141416;
+    --popover: #ffffff;
+    --popover-foreground: #141416;
+    --primary: #141416;
+    --primary-foreground: #fafafa;
+    --secondary: #ececee;
+    --secondary-foreground: #141416;
+    --muted: #ececee;
+    --muted-foreground: #62626a;
+    --accent: #ececee;
+    --accent-foreground: #141416;
+    --destructive: #d93025;
+    --border: #e1e1e5;
+    --input: #d4d4d9;
+    --ring: #4285f4;
+    --chart-1: #4285f4;
+    --chart-2: #fbbc04;
+    --chart-3: #34a853;
+    --chart-4: #ea4335;
+    --chart-5: #62626a;
+    --radius: 0.75rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #141416;
+    --sidebar-primary: #4285f4;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #ececee;
+    --sidebar-accent-foreground: #141416;
+    --sidebar-border: #e1e1e5;
+    --sidebar-ring: #4285f4;
+}
+
+.dark {
     color-scheme: dark;
     --google-blue: #4285f4;
     --google-red: #ea4335;

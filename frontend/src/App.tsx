@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Inbox, KeyRound, LogOut, FileText, Users, FolderKanban } from 'lucide-react'
+import { Inbox, KeyRound, LogOut, FileText, Users, FolderKanban, Moon, Sun } from 'lucide-react'
+import { Logo } from '@/components/logo'
+import { useTheme } from '@/lib/theme'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,7 +44,7 @@ function SignIn({ onDone }: { onDone: () => void }) {
   return (
     <main className="grid min-h-svh place-items-center p-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-6 rounded-2xl border bg-card p-8">
-        <img src="/admin/gdg-logo.png" alt="Google Developer Group, Babcock University" className="h-9 w-auto" />
+        <Logo className="h-9 w-auto" />
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">Email console</h1>
           <p className="text-sm text-muted-foreground">
@@ -72,6 +74,7 @@ function Console({ onSignOut }: { onSignOut: () => void }) {
     setChosen(id)
     localStorage.setItem('gdg-project', id)
   }
+  const [theme, toggleTheme] = useTheme()
   const title = VIEWS.find((v) => v.id === view)!.label
 
   return (
@@ -79,7 +82,7 @@ function Console({ onSignOut }: { onSignOut: () => void }) {
       <Sidebar collapsible="icon">
         <SidebarHeader className="gap-4 p-3">
           <div className="flex h-9 items-center px-1">
-            <img src="/admin/gdg-logo.png" alt="GDG Babcock" className="h-7 w-auto group-data-[collapsible=icon]:hidden" />
+            <Logo className="h-7 w-auto group-data-[collapsible=icon]:hidden" />
             <img src="/admin/favicon.svg" alt="GDG Babcock" className="hidden size-6 group-data-[collapsible=icon]:block" />
           </div>
           <div className="space-y-1.5 group-data-[collapsible=icon]:hidden">
@@ -124,6 +127,9 @@ function Console({ onSignOut }: { onSignOut: () => void }) {
           <SidebarTrigger />
           <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
           {project && view !== 'projects' && <span className="text-sm text-muted-foreground">{project.name}</span>}
+          <Button variant="ghost" size="icon" className="ml-auto" aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme}>
+            {theme === 'dark' ? <Sun /> : <Moon />}
+          </Button>
         </header>
         <div className="mx-auto w-full max-w-5xl p-4 md:p-8">
           {projects.loading ? null : view === 'projects' ? (

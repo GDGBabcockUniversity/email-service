@@ -35,8 +35,14 @@ function Editor({ project, template, onClose, onSaved }: { project: Project; tem
     }
   }
 
-  // Fields like {{.name}} show as highlighted placeholders, so the preview reads like the sent email.
-  const preview = form.content.replace(/\{\{\s*\.(\w+)\s*\}\}/g, '<mark style="background:#fff3bf;padding:0 2px;border-radius:3px">$1</mark>')
+  // Placeholders inside attributes (href, src) can't be highlighted without breaking the markup,
+  // so they get inert values; placeholders in the text show as highlighted field names.
+  const field = /\{\{\s*\.(\w+)\s*\}\}/g
+  const blank = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23d4d4d9'/%3E%3C/svg%3E"
+  const preview = form.content
+    .replace(/(\w+)="([^"]*)"/g, (_, attr: string, value: string) => `${attr}="${value.replace(field, attr === 'src' ? blank : '#')}"`)
+    .replace(field, '<mark style="background:#fff3bf;padding:0 2px;border-radius:3px">$1</mark>')
+  const previewSubject = form.subject.replace(field, '$1')
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -60,7 +66,7 @@ function Editor({ project, template, onClose, onSaved }: { project: Project; tem
             <div className="flex min-h-64 flex-col gap-2">
               <Label>Preview</Label>
               <div className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-white text-black">
-                <p className="truncate border-b bg-neutral-100 px-4 py-2 text-sm font-medium">{form.subject || 'No subject yet'}</p>
+                <p className="truncate border-b bg-neutral-100 px-4 py-2 text-sm font-medium">{previewSubject || 'No subject yet'}</p>
                 <iframe title="Email preview" sandbox="" srcDoc={`<body style="font-family:system-ui,sans-serif;margin:16px">${preview}</body>`} className="w-full flex-1 bg-white" />
               </div>
             </div>
