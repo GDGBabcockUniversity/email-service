@@ -3,6 +3,8 @@ package http
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -57,38 +59,28 @@ func TestSendEmail_InvalidJSON_ReturnsBadRequest(t *testing.T) {
 	}
 }
 
-func TestAdminDashboard_ServesPageAndAssetsWithoutAdminKey(t *testing.T) {
+func TestAdminDashboard_ServesBuiltConsoleWithoutAdminKey(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	dist := t.TempDir()
+	assert.NoError(t, os.MkdirAll(filepath.Join(dist, "assets"), 0o755))
+	assert.NoError(t, os.WriteFile(filepath.Join(dist, "index.html"), []byte("<div id=root></div>"), 0o644))
+	assert.NoError(t, os.WriteFile(filepath.Join(dist, "assets", "app.js"), []byte("console.log(1)"), 0o644))
+	t.Setenv("WEB_DIST", dist)
 	router := NewRouter("admin-secret", nil, nil, nil, nil, nil, nil)
-	for path, want := range map[string]string{
-		"/admin":                               "text/html",
-		"/admin/static/css/dashboard.css":      "text/css",
-		"/admin/static/js/dashboard.js":        "javascript",
-		"/admin/static/img/gdg-logo.png":       "image/png",
-		"/admin/static/img/gdg-logo-light.png": "image/png",
-		"/admin/static/img/favicon.svg":        "image/svg+xml",
+	for path, want := range map[string]struct {
+		code int
+		body string
+	}{
+		"/admin":               {http.StatusMovedPermanently, ""},
+		"/admin/":              {http.StatusOK, "<div id=root>"},
+		"/admin/assets":        {http.StatusOK, "<div id=root>"},
+		"/admin/assets/app.js": {http.StatusOK, "console.log(1)"},
+		"/admin/anything":      {http.StatusOK, "<div id=root>"},
 	} {
-		request := httptest.NewRequest(http.MethodGet, path, nil)
 		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-		assert.Equal(t, http.StatusOK, response.Code, path)
-		assert.Contains(t, response.Header().Get("Content-Type"), want, path)
-	}
-}
-
-func TestAdminDashboard_PageReferencesItsOwnAssets(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := NewRouter("admin-secret", nil, nil, nil, nil, nil, nil)
-	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	response := httptest.NewRecorder()
-	router.ServeHTTP(response, request)
-	body := response.Body.String()
-	for _, asset := range []string{
-		"/admin/static/css/dashboard.css",
-		"/admin/static/js/dashboard.js",
-		"/admin/static/img/gdg-logo-light.png",
-	} {
-		assert.Contains(t, body, asset)
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		assert.Equal(t, want.code, response.Code, path)
+		assert.Contains(t, response.Body.String(), want.body, path)
 	}
 }
 

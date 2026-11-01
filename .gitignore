@@ -3,3 +3,6 @@
 !.env.example
 /email-service
 /coverage.out
+
+/frontend/dist
+/frontend/node_modules

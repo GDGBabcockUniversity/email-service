@@ -26,31 +26,24 @@ For execution outside Docker, export the environment variables before running `g
 ## Admin dashboard
 
 The service serves a browser console at `http://localhost:8080/admin`. It tracks delivery
-progress, sends a project's templates, manages each project's audience, and edits email
-templates. Sign in with the same
-`ADMIN_API_KEY` the management API uses; the key is kept in the browser's local storage and
-sent as `X-Admin-Key` on every request, so the page itself holds no secrets and serves
-unauthenticated.
+progress, sends a project's templates, manages each project's audience, edits email
+templates, and manages projects and API keys. Sign in with the same `ADMIN_API_KEY` the
+management API uses; the key lives in the tab's session storage and is sent as `X-Admin-Key`
+on every `/api` call, so the files themselves hold no secrets and are served unauthenticated.
 
-The front end lives in `web/` and is plain HTML, CSS, and JavaScript with no build step:
+The console is a React + shadcn/ui app in `frontend/` (Vite, Tailwind). The Docker build
+compiles it in a Node stage and copies `dist/` into the final image at `/app/web/dist`; the
+service reads the directory named by `WEB_DIST` (default `frontend/dist`) and skips `/admin`
+with a warning if it is missing.
 
 ```
-web/
-  embed.go              Go embed directives and the fs.FS the router mounts
-  index.html            the single page
-  static/css/           stylesheet
-  static/js/            dashboard logic
-  static/img/           GDG Babcock logo (light variant for dark surfaces) and favicon
+cd frontend && npm install
+npm run dev     # http://localhost:5173/admin/, proxies /api to the service on :8080
+npm run build   # writes frontend/dist, which `go run ./cmd/server` then serves at /admin
 ```
 
-`go:embed` compiles the whole tree into the binary, so the dashboard ships with the service
-and needs no extra files at runtime. Editing anything under `web/` takes effect on the next
-`go build`.
-
-The console follows the chapter website's dark surface language. `gdg-logo.png` is the original
-lockup; `gdg-logo-light.png` is the same artwork with its black wordmark inverted to white so it
-reads on the dark background, and is what the page loads. The four Google colours are reserved
-for delivery status, so a colour always means the same thing.
+The console follows the chapter website's dark surface language. The four Google colours are
+reserved for delivery status, so a colour always means the same thing.
 
 ## API
 

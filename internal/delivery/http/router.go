@@ -7,6 +7,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/domain"
@@ -16,7 +19,6 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	_ "github.com/GDGBabcockUnivsersity/email_service/cmd/server/docs"
-	"github.com/GDGBabcockUnivsersity/email_service/web"
 )
 
 func NewRouter(adminKey string, projectService *services.ProjectService, templateService *services.TemplateService, apiKeyService *services.ApiKeyService, emailService *services.EmailService, sanityService *services.SanityService, unsubscribeService *services.UnsubscribeService) *gin.Engine {
@@ -87,7 +89,14 @@ func (h *Handler) authenticateEmail() gin.HandlerFunc {
 }
 
 func respondError(c *gin.Context, err error) {
-	status, message := http.StatusInternalServerError, "Internal Server Error"
+	status, message := errorStatus(err)
+	c.Abort()
+	c.JSON(status, dto.ApiResponse[any]{Message: message, Data: nil})
+}
+
+// errorStatus maps a service error to the status and message shown to callers.
+func errorStatus(err error) (status int, message string) {
+	status, message = http.StatusInternalServerError, "Internal Server Error"
 	switch {
 	case errors.Is(err, domain.ErrInvalidRequest):
 		status, message = http.StatusBadRequest, err.Error()
@@ -100,21 +109,37 @@ func respondError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrUnavailable), errors.Is(err, context.DeadlineExceeded):
 		status, message = http.StatusServiceUnavailable, domain.ErrUnavailable.Error()
 	}
-	c.Abort()
-	c.JSON(status, dto.ApiResponse[any]{Message: message, Data: nil})
+	return status, message
 }
 
-// mountDashboard serves the embedded admin dashboard. The page itself is public;
-// every API call it makes still carries the admin key the operator signs in with.
+// mountDashboard serves the built React console from the WEB_DIST directory
+// (the Docker image puts it at /app/web/dist). The files are public; every API
+// call the console makes still carries the admin key the operator signs in with.
 func mountDashboard(router *gin.Engine) {
-	page, err := web.Dashboard()
-	if err != nil {
-		slog.Error("Admin dashboard unavailable", "error", err)
+	dir := os.Getenv("WEB_DIST")
+	if dir == "" {
+		dir = "frontend/dist"
+	}
+	index := filepath.Join(dir, "index.html")
+	if _, err := os.Stat(index); err != nil {
+		slog.Warn("Admin console not built; /admin is disabled", "dir", dir)
 		return
 	}
-	router.GET("/admin", func(c *gin.Context) {
+	files := http.Dir(dir)
+	router.GET("/admin", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/admin/") })
+	router.GET("/admin/*path", func(c *gin.Context) {
+		// A real file is served as is; anything else gets the page, never a listing.
+		if name := path.Clean("/" + c.Param("path")); name != "/" {
+			if f, err := files.Open(name); err == nil {
+				info, statErr := f.Stat()
+				_ = f.Close()
+				if statErr == nil && !info.IsDir() {
+					c.FileFromFS(name, files)
+					return
+				}
+			}
+		}
 		c.Header("Cache-Control", "no-cache")
-		c.Data(http.StatusOK, "text/html; charset=utf-8", page)
+		c.File(index)
 	})
-	router.StaticFS("/admin/static", http.FS(web.Static()))
 }
