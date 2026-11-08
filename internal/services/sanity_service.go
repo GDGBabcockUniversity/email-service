@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
+	"github.com/GDGBabcockUnivsersity/email_service/internal/domain"
 	sanity "github.com/sanity-io/client-go"
 )
 
@@ -21,7 +22,7 @@ type SanityService struct {
 	Dataset      string
 	Secret       string
 	EmailService *EmailService
-	Client *sanity.Client
+	Client       *sanity.Client
 }
 
 func NewSanityService(projectID, dataset, secret, token string, emailService *EmailService, opts ...sanity.Option) *SanityService {
@@ -121,7 +122,18 @@ func (s *SanityService) fetchPublished(ctx context.Context, id string) (string, 
 		return "", nil, nil
 	}
 
-	result, err := s.Client.Query(`*[_id == $id && _type in ["issue", "article"]][0]{_type, title, "issueNumber": string(issueNumber), "slug": slug.current, "cover": coverImage.asset->url}`).
+	result, err := s.Client.Query(`
+		*[_id == $id
+		  && _type in ["issue", "article"]
+		  && !(_type == "article" && defined(issue))
+				][0]{
+		  _type,
+		  title,
+		  "slug": slug.current,
+		  "issueNumber": string(coalesce(issueNumber, issue->issueNumber)),
+		  "cover": coalesce(coverImage.asset->url, issue->coverImage.asset->url)
+		}
+		`).
 		Param("id", id).Do(ctx)
 	if err != nil {
 		return "", nil, err
@@ -165,6 +177,10 @@ func (s *SanityService) Webhook(ctx context.Context, projectID string, data dto.
 		Template: template,
 		Data:     fields,
 	})
+	if errors.Is(err, domain.ErrNotFound) {
+		// Articles and issues send different templates; name the missing one.
+		return fmt.Errorf("project %s has no %q template: %w", projectID, template, err)
+	}
 
 	if err != nil {
 		return err
