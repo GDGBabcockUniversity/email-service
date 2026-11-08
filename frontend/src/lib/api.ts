@@ -81,3 +81,50 @@ export const ago = (iso: string | null) => {
   if (minutes < 43200) return `${Math.floor(minutes / 1440)}d ago`
   return new Date(iso).toLocaleDateString()
 }
+
+export type Snapshot = { stats: Stats; emails: Email[] }
+
+// Live delivery feed over server-sent events. fetch (not EventSource) so the admin key stays in a header, not the URL.
+export function useEmailStream(projectId: string, status: string) {
+  const [data, setData] = useState<Snapshot | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    const abort = new AbortController()
+    let retry: ReturnType<typeof setTimeout>
+    setData(null)
+    const run = async () => {
+      try {
+        const query = `limit=100${status ? `&status=${status}` : ''}`
+        const response = await fetch(`/api/projects/${projectId}/emails/stream?${query}`, { headers: { 'X-Admin-Key': adminKey.get() }, signal: abort.signal })
+        if (response.status === 401) {
+          adminKey.clear()
+          window.location.reload()
+          return
+        }
+        if (!response.ok || !response.body) throw new Error('Could not open the live feed.')
+        setError(null)
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+        let buffer = ''
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += value
+          let end
+          while ((end = buffer.indexOf('\n\n')) >= 0) {
+            const line = buffer.slice(0, end).split('\n').find((l) => l.startsWith('data: '))
+            buffer = buffer.slice(end + 2)
+            if (line) setData(JSON.parse(line.slice(6)))
+          }
+        }
+        throw new Error('The live feed closed.')
+      } catch (e) {
+        if (abort.signal.aborted) return
+        setError(e instanceof Error ? e.message : 'The live feed dropped.')
+        retry = setTimeout(run, 3000)
+      }
+    }
+    run()
+    return () => { abort.abort(); clearTimeout(retry) }
+  }, [projectId, status])
+  return { data, error }
+}

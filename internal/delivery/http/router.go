@@ -57,6 +57,7 @@ func NewRouter(adminKey string, projectService *services.ProjectService, templat
 	admin.POST("/projects/:projectId/emails", handler.sendProjectEmail)
 	admin.GET("/projects/:projectId/emails", handler.listEmails)
 	admin.GET("/projects/:projectId/emails/stats", handler.emailStats)
+	admin.GET("/projects/:projectId/emails/stream", handler.streamEmails)
 	mountDashboard(router)
 	router.NoRoute(func(c *gin.Context) {
 		respondError(c, domain.ErrNotFound)

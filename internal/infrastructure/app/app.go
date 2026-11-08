@@ -10,6 +10,7 @@ import (
 
 	delivery "github.com/GDGBabcockUnivsersity/email_service/internal/delivery/http"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/infrastructure/config"
+	"github.com/GDGBabcockUnivsersity/email_service/internal/infrastructure/events"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/infrastructure/postgres"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/infrastructure/redis"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/infrastructure/smtp"
@@ -42,7 +43,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	projectRepo := postgres.NewProjectRepository(db)
 	templateRepo := postgres.NewTemplateRepository(db)
 	keyRepo := postgres.NewApiKeyRepository(db)
-	emailRepo := postgres.NewEmailRepository(db)
+	emailRepo := events.NewEmailRepository(postgres.NewEmailRepository(db))
 	audienceRepo := postgres.NewAudienceRepository(db)
 	unsubscribeTokens := services.NewUnsubscribeTokens(cfg.UnsubscribeSecret, cfg.PublicBaseURL)
 	projectService := services.NewProjectService(projectRepo, audienceRepo, unsubscribeTokens, postgres.OwnerID)

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Empty, STATUS, StatusBadge } from '@/components/status'
-import { api, ago, useResource, type Email, type Project, type Stats, type Template } from '@/lib/api'
+import { api, ago, useEmailStream, useResource, type Project, type Stats, type Template } from '@/lib/api'
 
 const FILTERS = [['', 'All'], ['PENDING', 'Queued'], ['PROCESSING', 'Sending'], ['SENT', 'Sent'], ['FAILED', 'Failed']] as const
 
@@ -118,9 +118,9 @@ function Compose({ project, open, onClose, onSent }: { project: Project; open: b
 export default function Delivery({ project }: { project: Project }) {
   const [status, setStatus] = useState('')
   const [composing, setComposing] = useState(false)
-  const stats = useResource<Stats>(`/projects/${project.id}/emails/stats`, 5000)
-  const emails = useResource<Email[]>(`/projects/${project.id}/emails?limit=100${status ? `&status=${status}` : ''}`, 5000)
-  const reload = () => { stats.reload(); emails.reload() }
+  const feed = useEmailStream(project.id, status)
+  const stats = feed.data?.stats
+  const emails = feed.data?.emails
 
   return (
     <div className="space-y-6">
@@ -130,8 +130,8 @@ export default function Delivery({ project }: { project: Project }) {
         </Tabs>
         <Button onClick={() => setComposing(true)}><Send /> Send an email</Button>
       </div>
-      {stats.data && <Pipeline stats={stats.data} />}
-      {emails.data && emails.data.length === 0 ? (
+      {stats && <Pipeline stats={stats} />}
+      {emails && emails.length === 0 ? (
         <Empty title={status ? 'Nothing with that status' : 'No emails yet'}>
           {status ? 'Try another filter.' : 'Send your first email and it will show up here.'}
         </Empty>
@@ -142,7 +142,7 @@ export default function Delivery({ project }: { project: Project }) {
               <TableRow><TableHead>Recipient</TableHead><TableHead>Subject</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Queued</TableHead></TableRow>
             </TableHeader>
             <TableBody>
-              {emails.data?.map((m) => (
+              {emails?.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-mono text-xs">{m.to}</TableCell>
                   <TableCell className="max-w-64 truncate">{m.subject}</TableCell>
@@ -157,8 +157,8 @@ export default function Delivery({ project }: { project: Project }) {
           </Table>
         </div>
       )}
-      {emails.error && <p className="text-sm text-destructive">{emails.error}</p>}
-      <Compose key={String(composing)} project={project} open={composing} onClose={() => setComposing(false)} onSent={reload} />
+      {feed.error && <p className="text-sm text-destructive">{feed.error}</p>}
+      <Compose key={String(composing)} project={project} open={composing} onClose={() => setComposing(false)} onSent={() => {}} />
     </div>
   )
 }

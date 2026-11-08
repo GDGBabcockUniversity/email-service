@@ -232,3 +232,61 @@ func (s *EmailService) EmailStats(ctx context.Context, projectID string) (*dto.E
 	stats.Total = stats.Pending + stats.Processing + stats.Sent + stats.Failed
 	return stats, nil
 }
+
+// EmailSnapshot is what the dashboard stream pushes: the stats and the email list together.
+type EmailSnapshot struct {
+	Stats  *dto.EmailStats `json:"stats"`
+	Emails []domain.Email  `json:"emails"`
+}
+
+// Watch emits a snapshot now and another after each change to the project's
+// emails, until ctx ends or emit fails. emit(nil) is a keep-alive ping.
+func (s *EmailService) Watch(ctx context.Context, projectID, status string, limit int, emit func(*EmailSnapshot) error) error {
+	events, ok := s.emailRepo.(interface {
+		Subscribe(string) (<-chan struct{}, func())
+	})
+	if !ok {
+		return domain.ErrUnavailable
+	}
+	changed, unsubscribe := events.Subscribe(projectID)
+	defer unsubscribe()
+	ping := time.NewTicker(20 * time.Second)
+	defer ping.Stop()
+
+	for {
+		emails, err := s.ListEmails(ctx, projectID, status, limit)
+		if err != nil {
+			return err
+		}
+		stats, err := s.EmailStats(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		if err := emit(&EmailSnapshot{Stats: stats, Emails: emails}); err != nil {
+			return err
+		}
+	wait:
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-ping.C:
+				if err := emit(nil); err != nil {
+					return err
+				}
+			case <-changed:
+				break wait
+			}
+		}
+		// Let a burst of updates (a bulk send) settle into one refresh.
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(time.Second):
+		}
+		select {
+		case <-changed:
+		default:
+		}
+	}
+}

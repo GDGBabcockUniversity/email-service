@@ -42,7 +42,8 @@ func (r *EmailRepository) FindByProjectID(ctx context.Context, projectID string,
 	if status != "" {
 		query = query.Where("status = ?", string(status))
 	}
-	emails, err := query.Order("created_at DESC, id DESC").Limit(limit).Find(ctx)
+	// The dashboard never shows the rendered body, so skip the biggest column.
+	emails, err := query.Select("id, \"to\", project_id, template_id, subject, status, attempts, last_error, created_at, sent_at").Order("created_at DESC, id DESC").Limit(limit).Find(ctx)
 	return emails, repositoryError(err)
 }
 

@@ -2,10 +2,12 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/GDGBabcockUnivsersity/email_service/internal/delivery/dto"
 	"github.com/GDGBabcockUnivsersity/email_service/internal/domain"
@@ -615,4 +617,46 @@ func (h *Handler) resubscribe(c *gin.Context) {
 // subscription reports the consent state without leaking the stored token hash.
 func subscription(audience *domain.Audience) dto.Subscription {
 	return dto.Subscription{Email: audience.Email, ProjectID: audience.ProjectID, Subscribed: audience.Subscribed}
+}
+
+// streamEmails godoc
+// @Summary Stream a project's delivery stats and emails
+// @Description Server-sent events: a "snapshot" event now and after every change to the project's emails.
+// @Tags Email
+// @Security AdminKey
+// @Produce text/event-stream
+// @Param projectId path string true "Project UUID"
+// @Param status query string false "Filter by delivery status" Enums(PENDING, PROCESSING, SENT, FAILED)
+// @Param limit query int false "Maximum emails to return (1-200, default 50)"
+// @Router /api/projects/{projectId}/emails/stream [get]
+func (h *Handler) streamEmails(c *gin.Context) {
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if err != nil {
+		respondError(c, domain.ErrInvalidRequest)
+		return
+	}
+	// The server's write timeout would otherwise cut the stream after 25s.
+	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{})
+	err = h.emailService.Watch(c.Request.Context(), c.Param("projectId"), c.Query("status"), limit, func(s *services.EmailSnapshot) error {
+		if !c.Writer.Written() {
+			c.Header("Content-Type", "text/event-stream")
+			c.Header("Cache-Control", "no-cache")
+			c.Header("X-Accel-Buffering", "no")
+		}
+		if s == nil {
+			_, err := fmt.Fprint(c.Writer, ": ping\n\n")
+			c.Writer.Flush()
+			return err
+		}
+		data, err := json.Marshal(s)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(c.Writer, "event: snapshot\ndata: %s\n\n", data)
+		c.Writer.Flush()
+		return err
+	})
+	if err != nil && !c.Writer.Written() {
+		respondError(c, err)
+	}
 }
